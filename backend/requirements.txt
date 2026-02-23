@@ -1,0 +1,16 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+alembic
+pydantic
+pydantic-settings
+python-dotenv
+requests
+loguru
+google-generativeai
+aiohttp
+tweepy
+gnews
+pytrends
+newspaper3k
+lxml_html_clean
