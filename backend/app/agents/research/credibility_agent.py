@@ -60,8 +60,16 @@ class CredibilityAgent(BaseAgent):
             # If DB fails, we still try to proceed with default authority (memory only)
             pass
 
+        # Check if we successfully verified any research
+        if len(verified_research) < 3:
+            return AgentOutput(
+                data={},
+                status="error",
+                feedback=f"Found only {len(verified_research)} verified sources (minimum 3 required for high-quality journalism)."
+            )
+
         # Combine snippets for LLM validation
-        combined_text = "\n\n".join([f"Source: {r['url']} (DA: {r['authority']})\nContent: {r['text'][:500]}..." for r in verified_research[:5]])
+        combined_text = "\n\n".join([f"Source: {r['url']} (DA: {r.get('authority', 0)})\nContent: {r['text'][:500]}..." for r in verified_research[:5]])
         
         prompt = f"""
         Evaluate the credibility of the following high-authority research data:

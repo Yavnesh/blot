@@ -29,5 +29,6 @@ class Post(Base):
     # New publishing and SEO fields
     word_count = Column(Integer, default=0)
     seo_data = Column(JSON, default={}) # Contains meta title, desc, slug, keywords
+    research_sources = Column(JSON, default=[]) # Snapshot of verified sources
     pub_platform = Column(String, default='none') # wordpress, webflow, etc.
     pub_meta = Column(JSON, default={}) # platform specific IDs or status
