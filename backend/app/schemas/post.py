@@ -22,6 +22,13 @@ class PostBase(BaseModel):
     image_crm: Optional[List[str]] = []
     all_image_data: Optional[List[str]] = []
     rep_count: Optional[str] = '0'
+    
+    # Newly added fields so the API exposes them
+    word_count: Optional[int] = 0
+    seo_data: Optional[Any] = {}
+    research_sources: Optional[Any] = []
+    pub_platform: Optional[str] = 'none'
+    pub_meta: Optional[Any] = {}
 
 # Properties to receive on creation
 class PostCreate(PostBase):

@@ -5,17 +5,25 @@ import re, random, time
 from app.core.config import settings
 from app.models.task_progress import TaskProgress
 
+def get_all_api_keys():
+    keys = [
+        settings.GEMINI_API_KEY_1,
+        settings.GEMINI_API_KEY_2,
+        settings.GEMINI_API_KEY_3,
+        settings.GEMINI_API_KEY_4,
+        settings.GEMINI_API_KEY_5,
+        settings.GEMINI_API_KEY_6,
+    ]
+    return [k for k in keys if k and k.strip()]
+
 def assign_random_api(exclude_keys=None):
     if exclude_keys is None:
         exclude_keys = []
-    # List of APIs
-    apis_list = [settings.GEMINI_API_KEY_1, settings.GEMINI_API_KEY_2, settings.GEMINI_API_KEY_3]
-    # Filter out empty strings and excluded keys
-    apis_list = [api for api in apis_list if api and api not in exclude_keys]
+    apis_list = [k for k in get_all_api_keys() if k not in exclude_keys]
     
     if not apis_list:
-        # If all are excluded, reset and try any available
-        apis_list = [api for api in [settings.GEMINI_API_KEY_1, settings.GEMINI_API_KEY_2, settings.GEMINI_API_KEY_3] if api]
+        # If all keys exhausted, try all available keys as a last resort
+        apis_list = get_all_api_keys()
         if not apis_list:
             raise ValueError("No Gemini API keys configured")
         

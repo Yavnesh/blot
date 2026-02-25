@@ -10,7 +10,7 @@ const FineTuneData = () => {
         const fetchSamples = async () => {
             try {
                 // Assuming backend is on the same host but port 8000
-                const response = await fetch('http://localhost:8000/api/v1/finetune/samples');
+                const response = await fetch('http://localhost:8080/api/v1/finetune/samples');
                 if (!response.ok) {
                     throw new Error('Failed to fetch fine-tuning data');
                 }
@@ -31,10 +31,19 @@ const FineTuneData = () => {
 
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold text-gray-800">Fine-Tuning Data Collection</h2>
-                <div className="bg-pink-100 text-pink-700 px-3 py-1 rounded-full text-sm font-medium">
-                    {samples.length} Samples Collected
+            <div className="flex justify-between items-center bg-white p-8 rounded-[2rem] border border-gray-100 shadow-sm">
+                <div className="max-w-2xl">
+                    <h2 className="text-3xl font-black text-gray-900 mb-3 tracking-tight">Fine-Tuning Dataset Refinery</h2>
+                    <p className="text-gray-500 text-sm font-medium leading-relaxed">
+                        This module captures the <span className="text-indigo-600 font-bold uppercase tracking-tighter">Latent Intelligence Traces</span> from the editorial pipeline. Each entry is a high-quality "Instruction-Completion" pair used to train future iterations of the agents, ensuring the system evolves and matures with every post generated.
+                    </p>
+                </div>
+                <div className="text-right">
+                    <div className="bg-indigo-50 text-indigo-600 px-6 py-3 rounded-2xl border border-indigo-100 mb-2">
+                        <span className="text-2xl font-black">{samples.length}</span>
+                        <span className="text-[10px] font-black uppercase tracking-widest ml-2">Intelligence Pairs</span>
+                    </div>
+                    <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest uppercase">Autonomous Collection Active</p>
                 </div>
             </div>
 

@@ -22,8 +22,10 @@ async def trigger_pipeline(
     """
     topic_id = trigger_in.topic_id
     user_topic = trigger_in.user_topic
+    post_id = trigger_in.post_id
     limit = trigger_in.limit
     include_images = trigger_in.include_images
+    reuse_scrape = trigger_in.reuse_scrape
     task_id = str(uuid.uuid4())
     topic_name = user_topic or "Auto-selected Trending"
     
@@ -31,12 +33,18 @@ async def trigger_pipeline(
         trend = db.query(Trending).filter(Trending.id == topic_id).first()
         if trend:
             topic_name = trend.topic
+    elif post_id:
+        from app.models.post import Post
+        post = db.query(Post).filter(Post.id == post_id).first()
+        if post:
+            topic_name = (post.title[0] if isinstance(post.title, list) else post.title) or f"Post #{post_id}"
             
     # Initialize progress record
     steps = [
-        {"name": "trend", "status": "pending"},
+        {"name": "trend", "status": "completed" if user_topic or topic_id else "pending"},
         {"name": "aggregator", "status": "pending"},
         {"name": "credibility", "status": "pending"},
+        {"name": "keyword_cluster", "status": "pending"},
         {"name": "intent", "status": "pending"},
         {"name": "draft", "status": "pending"},
         {"name": "voice", "status": "pending"},
@@ -62,12 +70,14 @@ async def trigger_pipeline(
     
     service = BlogGeneratorService(db)
     background_tasks.add_task(
-        service.run_full_pipeline, 
-        limit=limit, 
-        topic_id=topic_id, 
-        user_topic=user_topic, 
+        service.run_full_pipeline,
+        limit=limit,
+        topic_id=topic_id,
+        user_topic=user_topic,
+        post_id=post_id,
         task_id=task_id,
-        include_images=include_images
+        include_images=include_images,
+        reuse_scrape=reuse_scrape
     )
     
     return {"message": "Pipeline triggered", "task_id": task_id, "topic": topic_name}
@@ -91,6 +101,7 @@ async def get_task_status(
         "current_step": progress.current_step,
         "steps": progress.steps,
         "logs": progress.logs,
+        "preview_data": progress.preview_data,
         "updated_at": progress.updated_at
     }
 @router.get("/tasks", response_model=List[dict])

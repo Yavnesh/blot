@@ -12,5 +12,6 @@ class TaskProgress(Base):
     current_step = Column(String)
     steps = Column(JSON, default=[]) # List of step names with status {name: str, status: str}
     logs = Column(JSON, default=[])
+    preview_data = Column(JSON, default={}) # Partial data: headline, outline, fact_count
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

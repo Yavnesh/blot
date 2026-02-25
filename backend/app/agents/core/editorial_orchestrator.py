@@ -5,6 +5,7 @@ from app.agents.intelligence.trend_agent import TrendAgent
 from app.agents.research.aggregator_agent import AggregatorAgent
 from app.agents.research.credibility_agent import CredibilityAgent
 from app.agents.strategy.intent_agent import IntentAgent
+from app.agents.strategy.keyword_cluster_agent import KeywordClusterAgent
 from app.agents.writing.draft_agent import DraftAgent
 from app.agents.writing.voice_agent import VoiceAgent
 from app.agents.improvement.seo_agent import SEOAgent
@@ -23,6 +24,7 @@ class EditorialOrchestrator(Orchestrator):
         self.register_agent("trend", TrendAgent())
         self.register_agent("aggregator", AggregatorAgent())
         self.register_agent("credibility", CredibilityAgent())
+        self.register_agent("keyword_cluster", KeywordClusterAgent())
         self.register_agent("intent", IntentAgent())
         self.register_agent("draft", DraftAgent())
         self.register_agent("voice", VoiceAgent())
@@ -34,7 +36,7 @@ class EditorialOrchestrator(Orchestrator):
         self.register_agent("dataset", DatasetAgent())
         self.register_agent("image", ImageAgent())
 
-    async def run_editorial_workflow(self, db, topic_id: Optional[int] = None, user_topic: Optional[str] = None, target_audience: str = "General", task_id: Optional[str] = None, include_images: bool = True):
+    async def run_editorial_workflow(self, db, topic_id: Optional[int] = None, user_topic: Optional[str] = None, target_audience: str = "General", task_id: Optional[str] = None, include_images: bool = False, reuse_scrape: bool = False):
         """
         Full 6-layer agentic editorial workflow with dual-mode (Auto/User).
         """
@@ -57,10 +59,7 @@ class EditorialOrchestrator(Orchestrator):
                 db.commit()
                 db.refresh(trend)
             topic_id = trend.id
-            
-            # Topic Expansion (Semantic Clusters)
-            expansion_result = genai_client.generate_response_single(f"Generate 5 semantic clusters and secondary keywords for: {user_topic}")
-            self.state["semantic_clusters"] = expansion_result
+            # (Keyword cluster + SERP blueprint handled by dedicated agents below)
         elif topic_id:
             # Workflow A/B hybrid: User selected from Trends
             from app.models.trending import Trending
@@ -81,15 +80,64 @@ class EditorialOrchestrator(Orchestrator):
             topic_id = selected.get("id")
 
         # Layer 2: Research
-        research_result = await self.execute_task("aggregator", {"db": db, "trending_id": topic_id, "topic": self.state["topic"]})
+        research_result = await self.execute_task("aggregator", {
+            "db": db,
+            "trending_id": topic_id,
+            "topic": self.state["topic"],
+            "reuse_scrape": reuse_scrape  # Pass the flag into the agent
+        })
         self.state["research_data"] = research_result.data.get("research_data", [])
         await self.execute_task("credibility", self.state)
+        
+        # UI SCAFFOLDING: Update Fact Count
+        if task_id:
+            from app.models.task_progress import TaskProgress
+            progress = db.query(TaskProgress).filter(TaskProgress.task_id == task_id).first()
+            if progress:
+                preview = progress.preview_data or {}
+                preview["fact_count"] = len(self.state["research_data"])
+                progress.preview_data = preview
+                db.commit()
 
-        # Layer 3: Strategy
+        # Layer 3: Strategy — Keyword Cluster first, then SERP Blueprint
+        await self.execute_task("keyword_cluster", self.state)
+        
+        # UI SCAFFOLDING: Update primary keyword in preview
+        if task_id:
+            from app.models.task_progress import TaskProgress
+            progress = db.query(TaskProgress).filter(TaskProgress.task_id == task_id).first()
+            if progress:
+                preview = progress.preview_data or {}
+                preview["primary_keyword"] = self.state.get("primary_keyword", self.state.get("topic"))
+                preview["search_intent"] = self.state.get("search_intent", "informational")
+                progress.preview_data = preview
+                db.commit()
+
         await self.execute_task("intent", self.state)
+        
+        # UI SCAFFOLDING: Update Headline
+        if task_id:
+            progress = db.query(TaskProgress).filter(TaskProgress.task_id == task_id).first()
+            if progress:
+                preview = progress.preview_data or {}
+                preview["headline"] = self.state.get("topic")
+                progress.preview_data = preview
+                db.commit()
 
         # Layer 4: Writing (Now with 1200+ word enforcement)
         await self.execute_task("draft", self.state)
+        
+        # UI SCAFFOLDING: Update Outline Preview
+        if task_id:
+            progress = db.query(TaskProgress).filter(TaskProgress.task_id == task_id).first()
+            if progress:
+                preview = progress.preview_data or {}
+                # Extract first 3 lines as outline preview
+                draft = self.state.get("draft_content", "")
+                preview["outline"] = "\n".join(draft.split("\n")[:3]) + "..."
+                progress.preview_data = preview
+                db.commit()
+
         await self.execute_task("voice", self.state)
         
         if include_images:
@@ -108,8 +156,14 @@ class EditorialOrchestrator(Orchestrator):
         
         # PERSISTENCE: Save to DB as Post with Premium Metadata
         from app.models.post import Post
-        final_draft = self.state.get("final_draft") or self.state.get("draft_content")
-        word_count = self.state.get("word_count", 0)
+        final_draft = self.state.get("final_draft") or self.state.get("content_with_seo") or self.state.get("draft_content")
+        word_count = len(final_draft.split()) if final_draft else self.state.get("word_count", 0)
+        
+        # Grab SEO Agent Output
+        seo_extracted = self.state.get("seo_data", {})
+        focus_meta = seo_extracted.get("focus_keyword", self.state.get("topic"))
+        hashtags = seo_extracted.get("hashtags", [])
+        seo_score = seo_extracted.get("score", eval_result.data.get("score", 85))
         
         if final_draft:
             new_post = Post(
@@ -118,10 +172,12 @@ class EditorialOrchestrator(Orchestrator):
                 status="Draft",
                 word_count=word_count,
                 seo_data={
-                    "focus_keyword": self.state.get("topic"),
+                    "focus_keyword": focus_meta,
+                    "hashtags": hashtags,
                     "word_count": word_count,
-                    "score": eval_result.data.get("score", 0)
+                    "score": seo_score
                 },
+                research_sources=self.state.get("research_data", []),
                 meta=str(eval_result.data.get("critique", "Verification Passed"))
             )
             db.add(new_post)
@@ -135,6 +191,9 @@ class EditorialOrchestrator(Orchestrator):
                     from app.models.task_progress import TaskProgress
                     progress = db.query(TaskProgress).filter(TaskProgress.task_id == task_id).first()
                     if progress:
+                        preview = progress.preview_data or {}
+                        preview["seo_score"] = seo_score
+                        progress.preview_data = preview
                         progress.status = "completed"
                         db.commit()
 

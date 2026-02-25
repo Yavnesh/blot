@@ -27,6 +27,7 @@ def patch_db():
     post_cols = [
         ("word_count", "INTEGER DEFAULT 0"),
         ("seo_data", "JSON DEFAULT '{}'"),
+        ("research_sources", "JSON DEFAULT '[]'"),
         ("pub_platform", "VARCHAR DEFAULT 'none'"),
         ("pub_meta", "JSON DEFAULT '{}'")
     ]
@@ -52,6 +53,18 @@ def patch_db():
     )
     """)
     print("TrustSource table checked/created.")
+
+    # 4. Patch TaskProgress table
+    print("Patching TaskProgress table...")
+    task_cols = [
+        ("preview_data", "JSON DEFAULT '{}'")
+    ]
+    for col_name, col_type in task_cols:
+        try:
+            cursor.execute(f"ALTER TABLE task_progress ADD COLUMN {col_name} {col_type}")
+            print(f"Added {col_name} to task_progress")
+        except sqlite3.OperationalError:
+            print(f"Column {col_name} already exists in task_progress")
 
     conn.commit()
     conn.close()
