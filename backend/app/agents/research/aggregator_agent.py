@@ -107,18 +107,33 @@ class AggregatorAgent(BaseAgent):
                 if count >= 15:
                     break
                 try:
-                    article = newspaper.Article(url=item['url'])
+                    # Get the actual source URL from GNews publisher metadata if possible
+                    # This is much faster and more reliable than following redirects
+                    source_url = item.get('url')
+                    if item.get('publisher') and item['publisher'].get('href'):
+                        # Use publisher href as a high-authority fallback for domain check
+                        # but keep the news item url for specific article scraping
+                        pass
+
+                    article = newspaper.Article(url=source_url)
                     article.download()
                     article.parse()
 
+                    # In some cases, newspaper3k resolves the final URL after download
+                    final_url = article.url if article.url and not "news.google.com" in article.url else source_url
+                    
+                    # If we still have a google URL, try the publisher href from metadata
+                    if "news.google.com" in final_url and item.get('publisher'):
+                        final_url = item['publisher'].get('href', final_url)
+
                     titles.append(article.title)
                     texts.append(article.text)
-                    urls.append(item['url'])
+                    urls.append(final_url)
 
                     research_data.append({
                         "title": article.title,
                         "text": article.text,
-                        "url": item['url']
+                        "url": final_url # Use the resolved source URL
                     })
                     count += 1
                 except Exception as e:

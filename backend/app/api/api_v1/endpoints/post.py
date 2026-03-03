@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from app.api import deps
 from app.models.post import Post
 from app.schemas.post import PostCreate, PostUpdate, Post as PostSchema
+from app.services.agent_service import AgentService
 
 router = APIRouter()
 
@@ -57,25 +58,101 @@ def delete_post(*, db: Session = Depends(deps.get_db), id: int) -> Any:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# BLOG-SPECIFIC ENDPOINTS (RERUN & PUBLISH)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.post("/{id}/rerun-agent", response_model=dict)
+async def rerun_agent(
+    *, 
+    db: Session = Depends(deps.get_db), 
+    id: int, 
+    agent_key: str
+) -> Any:
+    """Rerun a specific agent for an existing post."""
+    result = await AgentService.rerun_agent_for_post(db, id, agent_key)
+    if result.get("status") == "error":
+        raise HTTPException(status_code=500, detail=result.get("message"))
+    return result
+
+
+@router.post("/{id}/confirm-rerun", response_model=PostSchema)
+def confirm_rerun(
+    *,
+    db: Session = Depends(deps.get_db),
+    id: int,
+    agent_key: str,
+    new_data: dict
+) -> Any:
+    """Confirm and save rerun data."""
+    post = db.query(Post).filter(Post.id == id).first()
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+        
+    # Apply new data based on agent
+    if agent_key == "seo":
+        post.seo_data = new_data.get("seo_data", post.seo_data)
+        if "score" in new_data:
+            post.seo_data["score"] = new_data["score"]
+    elif agent_key in ["draft", "voice", "readability"]:
+        # Update content array
+        new_content = new_data.get("final_draft") or new_data.get("content_with_seo")
+        if new_content:
+            post.content = [new_content]
+    elif agent_key == "evaluator":
+        post.meta = str(new_data.get("critique", post.meta))
+        if "score" in new_data:
+            if not post.seo_data:
+                post.seo_data = {}
+            post.seo_data["score"] = new_data["score"]
+            
+    # Update telemetry log for this agent
+    logs = list(post.agent_telemetry) if post.agent_telemetry else []
+    for log in logs:
+        if log.get("agent_name") == agent_key:
+            log["status"] = "success"
+            log["confidence_score"] = new_data.get("confidence_score") or new_data.get("seo_score") or new_data.get("score") or 0.0
+            break
+    post.agent_telemetry = logs
+    
+    db.add(post)
+    db.commit()
+    db.refresh(post)
+    return post
+
+
+@router.post("/{id}/publish", response_model=PostSchema)
+def publish_post(*, db: Session = Depends(deps.get_db), id: int) -> Any:
+    """Set post status to Published."""
+    post = db.query(Post).filter(Post.id == id).first()
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    post.status = "Published"
+    db.add(post)
+    db.commit()
+    db.refresh(post)
+    return post
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # PUBLIC BLOG ENDPOINTS  (consumed by the public blog website — no auth)
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _slug_for(post: Post) -> str:
     seo = post.seo_data or {}
-    title = (post.title[0] if isinstance(post.title, list) else post.title) or ""
-    return seo.get("url_slug") or title.lower().replace(" ", "-").replace("'", "").replace('"', "")[:80]
+    title = (post.title[0] if isinstance(post.title, list) and post.title else post.title) or ""
+    return seo.get("url_slug") or str(title).lower().replace(" ", "-").replace("'", "").replace('"', "")[:80]
 
 
 def _serialize_public(p: Post, full_content: bool = False) -> dict:
     seo = p.seo_data or {}
-    title = (p.title[0] if isinstance(p.title, list) else p.title) or "Untitled"
-    content = (p.content[0] if isinstance(p.content, list) else p.content) or ""
+    title = (p.title[0] if isinstance(p.title, list) and p.title else p.title) or "Untitled"
+    content = (p.content[0] if isinstance(p.content, list) and p.content else p.content) or ""
     slug = _slug_for(p)
     base = {
         "id": p.id,
         "title": title,
         "slug": slug,
-        "excerpt": content[:280],
+        "excerpt": str(content)[:280],
         "focus_keyword": seo.get("focus_keyword", ""),
         "meta_description": seo.get("meta_description", ""),
         "hashtags": seo.get("hashtags", []),

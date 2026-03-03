@@ -50,7 +50,14 @@ async def generate_image_api(image_prompt, id):
             logger.error(f"Error sending request: {e}")
             return None, None, None, False
 
+        start_time = asyncio.get_event_loop().time()
+        max_wait = 120 # Prevent infinite hang
+        
         while True:
+            if asyncio.get_event_loop().time() - start_time > max_wait:
+                logger.error(f"Image generation timed out after {max_wait}s")
+                return None, None, None, False
+
             check_url = STATUS_URL.format(job_id=request_id)
             try:
                 async with session.get(check_url, headers=headers) as response:
@@ -58,6 +65,10 @@ async def generate_image_api(image_prompt, id):
                     data = await response.json()
                     if data.get("done"):
                         break
+                    
+                    queue_pos = data.get("queue_position", 0)
+                    wait_est = data.get("wait_time", 0)
+                    logger.info(f"Horde Queue: Position {queue_pos}, Est. Wait {wait_est}s")
             except Exception as e:
                 logger.error(f"Error checking job status: {e}")
             await asyncio.sleep(10)
