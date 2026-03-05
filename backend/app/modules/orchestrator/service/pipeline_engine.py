@@ -254,25 +254,52 @@ class DeterministicPipelineEngine:
             # 7. Persistence
             db = self._get_db()
             try:
+                # SEO attributes extraction (check nested seo_data first, then fallback to flat state)
+                seo_pack = self.state.get("seo_data", {})
+                
+                # If meta_description or title are null, try to extract from content body
+                # This handles cases where the LLM embeds frontmatter in the text
+                ext_title = None
+                ext_meta = None
+                ext_slug = None
+                
+                if final_draft:
+                    import re
+                    t_match = re.search(r'\*{0,2}Title:\*{0,2}\s*(.+)', final_draft, re.I)
+                    m_match = re.search(r'\*{0,2}Meta Description:\*{0,2}\s*(.+)', final_draft, re.I)
+                    s_match = re.search(r'\*{0,2}URL Slug:\*{0,2}\s*`?([^\s`\n]+)`?', final_draft, re.I)
+                    if t_match: ext_title = t_match.group(1).strip()
+                    if m_match: ext_meta = m_match.group(1).strip()
+                    if s_match: ext_slug = s_match.group(1).strip()
+
+                final_seo_data = {
+                    "score": self.state.get("seo_score") or seo_pack.get("score", 75),
+                    "coverage_score": self.state.get("coverage_score") or seo_pack.get("coverage_score", 0.0),
+                    "focus_keyword": self.state.get("focus_keyword") or seo_pack.get("focus_keyword"),
+                    "search_intent": self.state.get("search_intent") or seo_pack.get("search_intent", "informational"),
+                    "url_slug": self.state.get("url_slug") or seo_pack.get("url_slug") or ext_slug,
+                    "meta_description": self.state.get("meta_description") or seo_pack.get("meta_description") or ext_meta,
+                    "title_variants": self.state.get("title_variants") or seo_pack.get("title_variants", []),
+                    "hashtags": self.state.get("hashtags") or seo_pack.get("hashtags", []),
+                    "coverage_missing": self.state.get("coverage_missing") or seo_pack.get("coverage_missing", []),
+                    "internal_link_suggestions": self.state.get("internal_link_suggestions") or seo_pack.get("internal_link_suggestions", [])
+                }
+
+                all_imgs = self.state.get("all_images", [])
+                cover = self.state.get("cover_image") or (all_imgs[0] if all_imgs else {})
+
                 new_post = Post(
-                    title=[self.state.get("topic", "Untitled")],
+                    title=[ext_title or self.state.get("topic", "Untitled")],
                     content=[final_draft],
                     status="Draft",
                     word_count=len(final_draft.split()) if final_draft else 0,
-                    seo_data={
-                        "score": self.state.get("seo_score", 85),
-                        "coverage": self.state.get("coverage_score", 0.0),
-                        "focus_keyword": self.state.get("focus_keyword"),
-                        "search_intent": self.state.get("search_intent"),
-                        "url_slug": self.state.get("url_slug"),
-                        "meta_description": self.state.get("meta_description"),
-                        "title_variants": self.state.get("title_variants", []),
-                        "hashtags": self.state.get("hashtags", []),
-                        "coverage_missing": self.state.get("coverage_missing", []),
-                        "internal_link_suggestions": self.state.get("internal_link_suggestions", [])
-                    },
+                    seo_data=final_seo_data,
                     research_sources=self.state.get("verified_research", []),
-                    agent_telemetry=self.logs
+                    agent_telemetry=self.logs,
+                    image_prompt=[cover.get("prompt")] if cover.get("prompt") else [],
+                    image_path=[cover.get("file_path")] if cover.get("file_path") else [],
+                    image_crm=[cover.get("crm_path")] if cover.get("crm_path") else [],
+                    all_image_data=all_imgs
                 )
                 db.add(new_post)
                 db.commit()

@@ -7,9 +7,18 @@ function formatDate(iso) {
 
 export default function PostCard({ post }) {
     return (
-        <article className="post-card">
-            <div className="post-card-thumb">
-                <div className="post-card-thumb-pattern" />
+        <article className="post-card group">
+            <div className="post-card-thumb overflow-hidden relative">
+                {post.image_url ? (
+                    <img
+                        src={`http://localhost:8080/${post.image_url}`}
+                        alt={post.title}
+                        className="post-card-image w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                    />
+                ) : (
+                    <div className="post-card-thumb-pattern w-full h-full" />
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                 {post.focus_keyword && (
                     <span className="post-card-keyword">🔑 {post.focus_keyword}</span>
                 )}

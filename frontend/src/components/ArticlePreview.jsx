@@ -78,8 +78,47 @@ const ArticlePreview = ({ post, onBack, onUpdate }) => {
         }
     };
 
-    const title = post.title?.[0] || 'Untitled Article';
-    const content = post.content?.[0] || '';
+    // Clean content parsing for premium preview experience
+    const rawContent = post.content?.[0] || post.content || '';
+
+    // Better regex for metadata markers
+    const titleMatch = rawContent.match(/\*{0,3}\s*Title:\s*\*{0,3}\s*([^\n]+)/i)
+    const metaMatch = rawContent.match(/\*{0,3}\s*Meta Description:\s*\*{0,3}\s*([^\n]+)/i)
+
+    let embeddedTitle = titleMatch ? titleMatch[1].trim() : null;
+    let embeddedMeta = metaMatch ? metaMatch[1].trim() : null;
+
+    // Fallback: If no "Title:" marker, use the first H1 (# Title)
+    if (!embeddedTitle) {
+        const h1Match = rawContent.match(/^#{1}\s+([^\n]+)/m);
+        if (h1Match) embeddedTitle = h1Match[1].trim();
+    }
+
+    const displayTitle = (embeddedTitle || post.title?.[0] || 'Untitled Article').replace(/^#+\s*/, '');
+    const displayMeta = embeddedMeta || post.seo_data?.meta_description || 'Expertly synthesized intelligence into actionable content.';
+
+    // Clean the body for rendering
+    let cleanContent = rawContent
+        .replace(/\*{0,3}\s*Title:\s*\*{0,3}\s*[^\n]+\n?/gi, '')
+        .replace(/\*{0,3}\s*Meta Description:\s*\*{0,3}\s*[^\n]+\n?/gi, '')
+        .replace(/\*{0,3}\s*URL Slug:\s*\*{0,3}\s*[^\n]+\n?/gi, '')
+        .replace(/^---+\s*\n?/gm, '')
+        .replace(/^\*+\s*\n?/gm, '')
+        .replace(/^#+\s*H\d:\s*/gim, '# ')
+        // Strip common AI preamble sentences
+        .replace(/^(This refined version|This refined draft|This version|This article|This draft|This content|The following draft).{0,100}(voice|tone|audience|flow|narrative|SEO|keyword|expert|deep-dive|brand).{0,60}\.\n?/gim, '')
+        .replace(/^\s+/, '');
+
+    // Handle redundant titles at the top
+    if (embeddedTitle) {
+        const titleEscaped = embeddedTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        // Strip H1, H2, or Bold title if it's the first thing in the content
+        const redundantTitleRegex = new RegExp(`^(#+\\s*|\\*{1,3}\\s*)${titleEscaped}(\\s*\\*{1,3})?\\s*\\n?`, 'i')
+        cleanContent = cleanContent.replace(redundantTitleRegex, '').trim()
+    }
+
+    cleanContent = cleanContent.replace(/^(\*+\s*)+/, '').trim();
+
     const telemetry = post.agent_telemetry || [];
 
     return (
@@ -97,7 +136,7 @@ const ArticlePreview = ({ post, onBack, onUpdate }) => {
                         <div className="h-8 w-[1px] bg-slate-200"></div>
                         <div>
                             <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-0.5">Article Preview</p>
-                            <h2 className="text-sm font-bold text-slate-900 truncate max-w-[400px]">{title}</h2>
+                            <h2 className="text-sm font-bold text-slate-900 truncate max-w-[400px]">{displayTitle}</h2>
                         </div>
                     </div>
                     <div className="flex items-center gap-4">
@@ -108,8 +147,8 @@ const ArticlePreview = ({ post, onBack, onUpdate }) => {
                             onClick={handlePublish}
                             disabled={isPublishing || post.status === 'Published'}
                             className={`px-8 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-xl shadow-indigo-200 active:scale-95 flex items-center gap-2 ${post.status === 'Published'
-                                    ? 'bg-emerald-50 text-emerald-600 border border-emerald-100 cursor-default shadow-none'
-                                    : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                                ? 'bg-emerald-50 text-emerald-600 border border-emerald-100 cursor-default shadow-none'
+                                : 'bg-indigo-600 text-white hover:bg-indigo-700'
                                 }`}
                         >
                             <span className="material-icons text-sm">{post.status === 'Published' ? 'check_circle' : 'publish'}</span>
@@ -123,19 +162,33 @@ const ArticlePreview = ({ post, onBack, onUpdate }) => {
                 {/* Hero Section */}
                 <section className="mb-20">
                     <div className="max-w-4xl">
-                        <div className="flex items-center gap-3 mb-8">
+                        {post.image_crm?.[0] && (
+                            <div className="mb-10 rounded-[3rem] overflow-hidden shadow-2xl border border-slate-200">
+                                <img
+                                    src={`http://localhost:8080/${post.image_crm[0]}`}
+                                    alt={displayTitle}
+                                    className="w-full h-auto object-cover max-h-[500px]"
+                                />
+                            </div>
+                        )}
+                        <h1 className="text-6xl font-black text-slate-900 leading-[1.05] tracking-tight mb-8">
+                            {displayTitle}
+                        </h1>
+                        <div className="flex items-center gap-3 mb-12">
                             <span className="bg-indigo-600 text-white px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest">
                                 {post.seo_data?.schema_type || 'Article'}
                             </span>
                             <span className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">
                                 {new Date(post.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
                             </span>
+                            {post.seo_data?.score > 0 && (
+                                <span className="bg-slate-100 text-slate-600 px-3 py-1 rounded-full text-[9px] font-black tracking-widest uppercase">
+                                    SEO {post.seo_data.score}%
+                                </span>
+                            )}
                         </div>
-                        <h1 className="text-6xl font-black text-slate-900 leading-[1.05] tracking-tight mb-10">
-                            {title}
-                        </h1>
                         <p className="text-xl text-slate-500 leading-relaxed max-w-2xl font-medium">
-                            {post.seo_data?.meta_description || 'Expertly synthesized intelligence into actionable content.'}
+                            {displayMeta}
                         </p>
                     </div>
                 </section>
@@ -156,7 +209,7 @@ const ArticlePreview = ({ post, onBack, onUpdate }) => {
                                     )
                                 }}
                             >
-                                {content}
+                                {cleanContent}
                             </ReactMarkdown>
                         </div>
                     </article>

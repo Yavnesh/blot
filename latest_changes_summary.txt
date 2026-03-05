@@ -1,0 +1,18 @@
+
+# Latest Changes: Autonomous Visuals & UI Refinement
+
+-   **Image Agent Enhancements**:
+    -   Implemented SEO-friendly image naming convention (slug-based filenames).
+    -   Integrated `STABLE_HORDE_API_KEY` into `config.py`.
+    -   Fixed persistence issue in `pipeline_engine.py` where images were not being saved to the database.
+
+-   **UI & UX Improvements**:
+    -   Enhanced `cleanPostData` logic to aggressively strip AI preambles and redundant titles from content.
+    -   Integrated premium image displays in:
+        -   `PostCard.jsx` (with hover zoom effect).
+        -   `BlogPost.jsx` (cinematic hero section).
+        -   `ArticlePreview.jsx` (admin visibility of generated assets).
+        -   `Posts.jsx` (visual repository thumbnails).
+
+-   **API Updates**:
+    -   Extended `_serialize_public` to expose image URLs and full asset data via REST endpoints.

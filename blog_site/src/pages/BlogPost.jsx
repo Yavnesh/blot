@@ -1,34 +1,16 @@
 import { useParams, Link } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { usePost } from '../hooks/usePosts'
 import Footer from '../components/Footer'
 
 const SITE_NAME = 'TEWS Intelligence'
-const SITE_URL = 'https://yourblog.com'
+const SITE_URL = 'http://localhost:5174'
 
 function formatDate(iso) {
     if (!iso) return ''
     return new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
-}
-
-// Render raw markdown-ish content as HTML string safely
-// We just do basic line-break parsing; full markdown via a lib would be better for production
-function renderContent(content) {
-    if (!content) return ''
-    return content
-        .replace(/^#{1} (.+)$/gm, '<h1>$1</h1>')
-        .replace(/^#{2} (.+)$/gm, '<h2>$1</h2>')
-        .replace(/^#{3} (.+)$/gm, '<h3>$1</h3>')
-        .replace(/^#{4} (.+)$/gm, '<h4>$1</h4>')
-        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-        .replace(/\*(.+?)\*/g, '<em>$1</em>')
-        .replace(/`(.+?)`/g, '<code>$1</code>')
-        .replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>')
-        .replace(/^- (.+)$/gm, '<li>$1</li>')
-        .replace(/(<li>.*<\/li>\n?)+/g, m => `<ul>${m}</ul>`)
-        .replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
-        .replace(/\n\n/g, '</p><p>')
-        .replace(/^(?!<)(.+)$/gm, '$1')
 }
 
 export default function BlogPost() {
@@ -61,25 +43,25 @@ export default function BlogPost() {
         </>
     )
 
-    const canonicalUrl = `${SITE_URL}/blog/${post.slug}`
+    // Data is pre-cleaned by the usePost hook
+    const displayTitle = post.title
+    const displayMeta = post.meta_description
+    const displaySlug = post.slug
+    const canonicalUrl = `${SITE_URL}/blog/${displaySlug}`
+
     const scoreColor = post.seo_score >= 85 ? '#2563eb' : post.seo_score >= 70 ? '#f97316' : '#ef4444'
 
-    // JSON-LD Article schema — the most important on-page ranking signal
     const articleSchema = {
         "@context": "https://schema.org",
         "@type": post.schema_type || "Article",
-        "headline": post.title,
-        "description": post.meta_description || post.excerpt,
+        "headline": displayTitle,
+        "description": displayMeta,
         "url": canonicalUrl,
         "datePublished": post.created_at,
         "dateModified": post.created_at,
         "wordCount": post.word_count,
         "keywords": [post.focus_keyword, ...(post.hashtags || [])].filter(Boolean).join(', '),
-        "publisher": {
-            "@type": "Organization",
-            "name": SITE_NAME,
-            "url": SITE_URL
-        },
+        "publisher": { "@type": "Organization", "name": SITE_NAME, "url": SITE_URL },
         "mainEntityOfPage": { "@type": "WebPage", "@id": canonicalUrl }
     }
 
@@ -94,22 +76,22 @@ export default function BlogPost() {
     return (
         <>
             <Helmet>
-                <title>{post.title} | {SITE_NAME}</title>
-                <meta name="description" content={post.meta_description || post.excerpt} />
+                <title>{displayTitle} | {SITE_NAME}</title>
+                <meta name="description" content={displayMeta} />
                 {post.focus_keyword && <meta name="keywords" content={[post.focus_keyword, ...(post.hashtags || [])].join(', ')} />}
                 <link rel="canonical" href={canonicalUrl} />
 
                 {/* Open Graph */}
                 <meta property="og:type" content="article" />
                 <meta property="og:url" content={canonicalUrl} />
-                <meta property="og:title" content={post.title} />
-                <meta property="og:description" content={post.meta_description || post.excerpt} />
+                <meta property="og:title" content={displayTitle} />
+                <meta property="og:description" content={displayMeta} />
                 <meta property="og:site_name" content={SITE_NAME} />
 
                 {/* Twitter Card */}
                 <meta name="twitter:card" content="summary_large_image" />
-                <meta name="twitter:title" content={post.title} />
-                <meta name="twitter:description" content={post.meta_description || post.excerpt} />
+                <meta name="twitter:title" content={displayTitle} />
+                <meta name="twitter:description" content={displayMeta} />
 
                 {/* Article-specific meta */}
                 <meta property="article:published_time" content={post.created_at} />
@@ -122,9 +104,26 @@ export default function BlogPost() {
             </Helmet>
 
             {/* ── Post Hero ──────────────────────────────────────────── */}
+            <div className="container" style={{ marginTop: '2rem' }}>
+                <Link to="/" className="back-link" style={{ fontSize: '0.8rem' }}>
+                    ← All Articles
+                </Link>
+            </div>
+
             <div className="post-hero">
                 <div className="container">
-                    <div className="post-meta-row">
+                    {post.image_url && (
+                        <div className="post-hero-image-wrap">
+                            <img
+                                src={`http://localhost:8080/${post.image_url}`}
+                                alt={displayTitle}
+                                className="post-hero-image"
+                            />
+                        </div>
+                    )}
+                    <h1 className="post-title" style={{ marginBottom: '1.5rem' }}>{displayTitle}</h1>
+
+                    <div className="post-meta-row" style={{ marginTop: '0' }}>
                         <span className="post-category-badge">
                             {post.schema_type || 'Article'}
                         </span>
@@ -137,26 +136,9 @@ export default function BlogPost() {
                         )}
                     </div>
 
-                    <h1 className="post-title">{post.title}</h1>
-
-                    {post.meta_description && (
-                        <p className="post-subtitle">{post.meta_description}</p>
+                    {displayMeta && (
+                        <p className="post-subtitle" style={{ marginTop: '2rem' }}>{displayMeta}</p>
                     )}
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-                        {post.focus_keyword && (
-                            <span className="post-keyword-pill">
-                                🔑 {post.focus_keyword}
-                            </span>
-                        )}
-                        {post.hashtags?.length > 0 && (
-                            <div className="post-tags-row">
-                                {post.hashtags.map((tag, i) => (
-                                    <span key={i} className="post-tag">{tag}</span>
-                                ))}
-                            </div>
-                        )}
-                    </div>
                 </div>
             </div>
 
@@ -164,16 +146,12 @@ export default function BlogPost() {
             <div className="post-layout">
                 {/* Main Article Content */}
                 <article>
-                    <Link to="/" className="back-link" style={{ display: 'inline-flex', marginBottom: '2rem', fontSize: '0.8rem' }}>
-                        ← All Articles
-                    </Link>
+                    <div className="post-content">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                            {post.content}
+                        </ReactMarkdown>
+                    </div>
 
-                    <div
-                        className="post-content"
-                        dangerouslySetInnerHTML={{ __html: '<p>' + renderContent(post.content) + '</p>' }}
-                    />
-
-                    {/* Hashtag Footer */}
                     {post.hashtags?.length > 0 && (
                         <div style={{ marginTop: '3rem', paddingTop: '2rem', borderTop: '1px solid var(--border)' }}>
                             <p style={{ fontSize: '0.72rem', fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-muted)', marginBottom: '0.75rem' }}>Topics</p>
@@ -188,7 +166,6 @@ export default function BlogPost() {
 
                 {/* Sidebar */}
                 <aside className="post-sidebar">
-                    {/* SEO Score Widget */}
                     {post.seo_score > 0 && (
                         <div className="sidebar-widget">
                             <div className="sidebar-widget-title">SEO Authority Score</div>
@@ -210,7 +187,6 @@ export default function BlogPost() {
                         </div>
                     )}
 
-                    {/* Internal Links */}
                     {post.internal_link_suggestions?.length > 0 && (
                         <div className="sidebar-widget">
                             <div className="sidebar-widget-title">Related Topics</div>
@@ -220,7 +196,6 @@ export default function BlogPost() {
                         </div>
                     )}
 
-                    {/* Research Sources */}
                     {post.research_sources?.length > 0 && (
                         <div className="sidebar-widget">
                             <div className="sidebar-widget-title">Research Sources</div>
@@ -234,7 +209,7 @@ export default function BlogPost() {
                                 >
                                     <span className="source-num">{i + 1}</span>
                                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                        {source.title || source.url}
+                                        {source.title && source.title !== 'Google News' ? source.title : new URL(source.url).hostname}
                                     </span>
                                 </a>
                             ))}

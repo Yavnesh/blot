@@ -41,14 +41,16 @@ class ImageAgent(BaseAgent):
         lines = llm_text.split("\n")
         images_data = []
         
+        # Extract a clean name/slug for image filing
+        image_slug = topic.lower().replace(" ", "-").replace("'", "").replace('"', "")[:50]
+
         # Process top 3 images (limit for speed/API cost)
         for line in lines:
             if "|" in line:
                 prompt_text, alt_text = [x.strip() for x in line.split("|")[:2]]
                 if prompt_text and alt_text:
-                    # In a real system, we'd trigger multiple horde calls.
-                    # For now, we simulate the primary cover image.
-                    crm_path, file_path, b64, censored = await horde_client.generate_image_api(prompt_text, post_id)
+                    # Pass the slug for cleaner server-side naming
+                    crm_path, file_path, b64, censored = await horde_client.generate_image_api(prompt_text, post_id, slug=image_slug)
                     images_data.append({
                         "prompt": prompt_text,
                         "alt_text": alt_text,

@@ -153,6 +153,7 @@ def _serialize_public(p: Post, full_content: bool = False) -> dict:
         "title": title,
         "slug": slug,
         "excerpt": str(content)[:280],
+        "image_url": p.image_crm[0] if p.image_crm and len(p.image_crm) > 0 else None,
         "focus_keyword": seo.get("focus_keyword", ""),
         "meta_description": seo.get("meta_description", ""),
         "hashtags": seo.get("hashtags", []),
@@ -168,6 +169,7 @@ def _serialize_public(p: Post, full_content: bool = False) -> dict:
         base["title_variants"] = seo.get("title_variants", [])
         base["internal_link_suggestions"] = seo.get("internal_link_suggestions", [])
         base["image_alt_text"] = seo.get("image_alt_text_suggestion", "")
+        base["all_images"] = p.all_image_data or []
     return base
 
 

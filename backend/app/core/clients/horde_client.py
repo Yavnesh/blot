@@ -12,8 +12,8 @@ STATUS_URL = "https://stablehorde.net/api/v2/generate/check/{job_id}"
 RESULT_URL = "https://stablehorde.net/api/v2/generate/status/{job_id}"
 
 
-async def generate_image_api(image_prompt, id):
-    logger.warning(f"Starting Generate Image API for id {id}")
+async def generate_image_api(image_prompt, id, slug=None):
+    logger.warning(f"Starting Generate Image API for id {id} (Slug: {slug})")
     
     prompt_text = image_prompt[0] if isinstance(image_prompt, list) else image_prompt
     
@@ -93,11 +93,14 @@ async def generate_image_api(image_prompt, id):
                 static_dir = Path("app/static/img/posts")
                 static_dir.mkdir(exist_ok=True, parents=True)
                 
-                filepath = static_dir / f"{image_id}_img_{id}.webp"
+                # Name by slug if available for better organization
+                name_base = slug if slug else f"img_{id}"
+                filename = f"{name_base}_{image_id[:8]}.webp"
+                filepath = static_dir / filename
                 filepath.write_bytes(image_bytes)
                 
                 base64_image = base64.b64encode(image_bytes).decode()
-                crm_path = f"static/img/posts/{image_id}_img_{id}.webp"
+                crm_path = f"static/img/posts/{filename}"
                 
                 return crm_path, str(filepath), base64_image, censored
                 

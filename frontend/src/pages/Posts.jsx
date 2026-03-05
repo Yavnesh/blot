@@ -1,8 +1,95 @@
 import React, { useState, useEffect } from 'react';
 import ArticlePreview from '../components/ArticlePreview';
 
+const API_BASE = 'http://localhost:8080/api/v1';
+
 const Posts = () => {
-    // ... state ... (no change to lines 6-104)
+    const [posts, setPosts] = useState([]);
+    const [tasks, setTasks] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [selectedPost, setSelectedPost] = useState(null);
+    const [editingPost, setEditingPost] = useState(null);
+    const [retryModal, setRetryModal] = useState(null);
+
+    const formatDuration = (start, end) => {
+        if (!start || !end) return null;
+        const secs = Math.round(end - start);
+        if (secs < 60) return `${secs}s`;
+        return `${Math.floor(secs / 60)}m ${secs % 60}s`;
+    };
+
+    const fetchAllData = async () => {
+        try {
+            const [postsRes, tasksRes] = await Promise.all([
+                fetch(`${API_BASE}/posts/`),
+                fetch(`${API_BASE}/generation/tasks`)
+            ]);
+            const postsData = await postsRes.json();
+            const tasksData = await tasksRes.json();
+            setPosts(Array.isArray(postsData) ? postsData : []);
+            // Only show in-progress tasks (not completed/error)
+            setTasks(Array.isArray(tasksData) ? tasksData.filter(t => t.status === 'in_progress' || t.status === 'running') : []);
+        } catch (err) {
+            console.error('Error fetching data:', err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchAllData();
+        // Poll every 5 seconds to update live tasks
+        const interval = setInterval(fetchAllData, 5000);
+        return () => clearInterval(interval);
+    }, []);
+
+    const handlePublish = async (postId) => {
+        try {
+            const res = await fetch(`${API_BASE}/posts/${postId}/publish`, { method: 'POST' });
+            if (res.ok) {
+                fetchAllData();
+            }
+        } catch (err) {
+            console.error('Error publishing post:', err);
+        }
+    };
+
+    const handleUpdatePost = async () => {
+        if (!editingPost) return;
+        try {
+            const titleInput = document.querySelector('#edit-title-input');
+            const contentInput = document.querySelector('#edit-content-input');
+            const updatedTitle = titleInput?.value || editingPost.title?.[0];
+            const updatedContent = contentInput?.value || editingPost.content?.[0];
+            const res = await fetch(`${API_BASE}/posts/${editingPost.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title: [updatedTitle], content: [updatedContent] })
+            });
+            if (res.ok) {
+                setEditingPost(null);
+                fetchAllData();
+            }
+        } catch (err) {
+            console.error('Error updating post:', err);
+        }
+    };
+
+    const handleRetry = async (postId, reuseData) => {
+        setRetryModal(null);
+        try {
+            const post = posts.find(p => p.id === postId);
+            const topic = post?.title?.[0] || '';
+            await fetch(`${API_BASE}/generation/trigger`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_topic: topic, reuse_scrape: reuseData, include_images: false })
+            });
+            fetchAllData();
+        } catch (err) {
+            console.error('Error retrying pipeline:', err);
+        }
+    };
 
     if (loading) return (
         <div className="flex items-center justify-center min-h-screen bg-slate-50">
@@ -66,9 +153,19 @@ const Posts = () => {
                 {/* Published Posts */}
                 {posts.map((post) => (
                     <div key={post.id} className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 overflow-hidden flex flex-col md:flex-row hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-1">
-                        <div className="md:w-1/3 h-64 md:h-auto bg-gray-50 relative group overflow-hidden flex items-center justify-center">
-                            <div className="absolute inset-0 bg-indigo-600 opacity-0 group-hover:opacity-10 transition-opacity duration-300"></div>
-                            <span className="material-icons text-gray-200 text-8xl group-hover:scale-110 transition-transform duration-500">article</span>
+                        <div className="md:w-1/3 h-64 md:h-auto bg-gray-50 relative group overflow-hidden flex items-center justify-center border-r-[1px] border-gray-50">
+                            {post.image_crm?.[0] ? (
+                                <img
+                                    src={`http://localhost:8080/${post.image_crm[0]}`}
+                                    alt={post.title?.[0]}
+                                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                                />
+                            ) : (
+                                <>
+                                    <div className="absolute inset-0 bg-indigo-600 opacity-0 group-hover:opacity-10 transition-opacity duration-300"></div>
+                                    <span className="material-icons text-gray-200 text-8xl group-hover:scale-110 transition-transform duration-500">article</span>
+                                </>
+                            )}
                         </div>
                         <div className="p-10 md:w-2/3 flex flex-col">
                             <div className="flex justify-between items-start mb-6">
@@ -155,6 +252,7 @@ const Posts = () => {
                             <div>
                                 <label className="text-xs font-black text-gray-400 uppercase tracking-widest block mb-1">Article Title</label>
                                 <input
+                                    id="edit-title-input"
                                     type="text"
                                     defaultValue={editingPost.title && editingPost.title[0]}
                                     className="w-full bg-gray-50 border border-gray-100 rounded-xl p-4 font-bold text-gray-800"
@@ -163,6 +261,7 @@ const Posts = () => {
                             <div>
                                 <label className="text-xs font-black text-gray-400 uppercase tracking-widest block mb-1">Body Content (HTML Supported)</label>
                                 <textarea
+                                    id="edit-content-input"
                                     rows="12"
                                     defaultValue={editingPost.content && editingPost.content[0]}
                                     className="w-full bg-gray-50 border border-gray-100 rounded-xl p-4 font-medium text-gray-700 font-serif leading-relaxed"
