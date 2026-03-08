@@ -14,3 +14,14 @@ gnews
 pytrends
 newspaper3k
 lxml_html_clean
+psycopg2-binary
+pgvector
+celery
+redis
+python-multipart
+scikit-learn
+prometheus-client
+sentry-sdk
+opentelemetry-api
+opentelemetry-sdk
+opentelemetry-instrumentation-fastapi

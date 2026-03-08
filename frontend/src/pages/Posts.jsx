@@ -1,49 +1,36 @@
 import React, { useState, useEffect } from 'react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import ArticlePreview from '../components/ArticlePreview';
+
+const API_BASE = 'http://localhost:8080/api/v1';
 
 const Posts = () => {
     const [posts, setPosts] = useState([]);
     const [tasks, setTasks] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
     const [selectedPost, setSelectedPost] = useState(null);
     const [editingPost, setEditingPost] = useState(null);
-    const [retryModal, setRetryModal] = useState(null); // { postId, topic }
+    const [retryModal, setRetryModal] = useState(null);
 
     const formatDuration = (start, end) => {
-        if (!start) return '';
-        const startTime = new Date(start);
-        const endTime = end ? new Date(end) : new Date();
-        const durationMs = endTime - startTime;
-        if (durationMs < 0) return '0s';
-        const seconds = Math.floor(durationMs / 1000);
-        const minutes = Math.floor(seconds / 60);
-        if (minutes > 0) return `${minutes}m ${seconds % 60}s`;
-        return `${seconds}s`;
+        if (!start || !end) return null;
+        const secs = Math.round(end - start);
+        if (secs < 60) return `${secs}s`;
+        return `${Math.floor(secs / 60)}m ${secs % 60}s`;
     };
 
     const fetchAllData = async () => {
         try {
             const [postsRes, tasksRes] = await Promise.all([
-                fetch('http://localhost:8080/api/v1/posts/'),
-                fetch('http://localhost:8080/api/v1/generation/tasks')
+                fetch(`${API_BASE}/posts/`),
+                fetch(`${API_BASE}/generation/tasks`)
             ]);
-
-            if (!postsRes.ok || !tasksRes.ok) throw new Error('Failed to fetch data');
-
             const postsData = await postsRes.json();
             const tasksData = await tasksRes.json();
-
-            setPosts(postsData);
-            // Filter only running or error tasks that don't have a post yet
-            const runningTasks = tasksData.filter(t =>
-                (t.status === 'running' || t.status === 'pending') &&
-                !postsData.some(p => p.title[0] === t.topic)
-            );
-            setTasks(runningTasks);
+            setPosts(Array.isArray(postsData) ? postsData : []);
+            // Only show in-progress tasks (not completed/error)
+            setTasks(Array.isArray(tasksData) ? tasksData.filter(t => t.status === 'in_progress' || t.status === 'running') : []);
         } catch (err) {
-            setError(err.message);
+            console.error('Error fetching data:', err);
         } finally {
             setLoading(false);
         }
@@ -51,248 +38,97 @@ const Posts = () => {
 
     useEffect(() => {
         fetchAllData();
-        const interval = setInterval(fetchAllData, 10000);
+        // Poll every 5 seconds to update live tasks
+        const interval = setInterval(fetchAllData, 5000);
         return () => clearInterval(interval);
     }, []);
 
-    const handleUpdatePost = (updatedData) => {
-        alert("Post updated successfully! (Local simulation)");
-        setEditingPost(null);
-    };
-
     const handlePublish = async (postId) => {
         try {
-            const response = await fetch(`http://localhost:8080/api/v1/posts/${postId}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status: 'Published' })
-            });
-            if (!response.ok) throw new Error('Failed to publish post');
-            fetchAllData();
-            alert("Post published successfully!");
+            const res = await fetch(`${API_BASE}/posts/${postId}/publish`, { method: 'POST' });
+            if (res.ok) {
+                fetchAllData();
+            }
         } catch (err) {
-            alert("Error publishing: " + err.message);
+            console.error('Error publishing post:', err);
         }
     };
 
-    const handleRetry = async (postId, reuseCache) => {
+    const handleUnpublish = async (postId) => {
+        try {
+            const res = await fetch(`${API_BASE}/posts/${postId}/unpublish`, { method: 'POST' });
+            if (res.ok) {
+                fetchAllData();
+            }
+        } catch (err) {
+            console.error('Error unpublishing post:', err);
+        }
+    };
+
+    const handleDelete = async (postId) => {
+        if (!window.confirm('Are you sure you want to delete this post?')) return;
+        try {
+            const res = await fetch(`${API_BASE}/posts/${postId}`, { method: 'DELETE' });
+            if (res.ok) {
+                fetchAllData();
+            }
+        } catch (err) {
+            console.error('Error deleting post:', err);
+        }
+    };
+    const handleUpdatePost = async () => {
+        if (!editingPost) return;
+        try {
+            const titleInput = document.querySelector('#edit-title-input');
+            const contentInput = document.querySelector('#edit-content-input');
+            const updatedTitle = titleInput?.value || editingPost.title?.[0];
+            const updatedContent = contentInput?.value || editingPost.content?.[0];
+            const res = await fetch(`${API_BASE}/posts/${editingPost.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title: [updatedTitle], content: [updatedContent] })
+            });
+            if (res.ok) {
+                setEditingPost(null);
+                fetchAllData();
+            }
+        } catch (err) {
+            console.error('Error updating post:', err);
+        }
+    };
+
+    const handleRetry = async (postId, reuseData) => {
         setRetryModal(null);
         try {
-            const res = await fetch('http://localhost:8080/api/v1/generation/trigger', {
+            const post = posts.find(p => p.id === postId);
+            const topic = post?.title?.[0] || '';
+            await fetch(`${API_BASE}/generation/trigger`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    post_id: postId,
-                    reuse_scrape: reuseCache,
-                    include_images: false
-                })
+                body: JSON.stringify({ user_topic: topic, reuse_scrape: reuseData, include_images: false })
             });
-            if (!res.ok) throw new Error('Failed to trigger retry');
-            const data = await res.json();
-            alert(`✅ Pipeline re-triggered! Task ID: ${data.task_id}`);
             fetchAllData();
         } catch (err) {
-            alert('❌ Retry failed: ' + err.message);
+            console.error('Error retrying pipeline:', err);
         }
     };
 
-    if (error) return (
-        <div className="p-8 text-red-600 bg-red-50 rounded-3xl m-8 text-center border-2 border-red-100 font-black uppercase tracking-widest">
-            Error: {error}
+    if (loading) return (
+        <div className="flex items-center justify-center min-h-screen bg-slate-50">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-indigo-600"></div>
         </div>
     );
 
     if (selectedPost) {
         return (
-            <div className="p-8 bg-gray-50 min-h-screen">
-                <button
-                    onClick={() => setSelectedPost(null)}
-                    className="mb-8 flex items-center text-gray-500 font-black hover:text-indigo-600 transition-all duration-300 uppercase tracking-widest text-[10px]"
-                >
-                    <span className="material-icons mr-2 text-sm">arrow_back</span> BACK TO REPOSITORY
-                </button>
-                <div className="max-w-5xl mx-auto bg-white rounded-[3rem] shadow-2xl overflow-hidden border border-gray-100">
-                    <div className="h-[400px] bg-gray-900 relative flex items-center justify-center overflow-hidden">
-                        {/* Branded style simulation */}
-                        <div className="absolute inset-0 bg-gradient-to-br from-indigo-900/40 to-black/60 z-10"></div>
-                        <div className="absolute inset-0 flex items-center justify-center opacity-20">
-                            <span className="material-icons text-[200px] text-white">auto_awesome</span>
-                        </div>
-
-                        <div className="absolute inset-x-0 bottom-0 p-12 pt-32 z-20">
-                            <div className="flex gap-4 mb-4">
-                                <span className="bg-indigo-500 text-white px-4 py-1 rounded-full text-[9px] font-bold uppercase tracking-widest">Premium Article</span>
-                                <span className="bg-white/20 text-white backdrop-blur-md px-4 py-1 rounded-full text-[9px] font-bold uppercase tracking-widest">Post #{selectedPost.id}</span>
-                            </div>
-                            <h1 className="text-5xl font-black text-white leading-[1.1] drop-shadow-2xl max-w-4xl tracking-tight">
-                                {selectedPost.title && selectedPost.title[0]}
-                            </h1>
-                        </div>
-                    </div>
-
-                    <div className="flex flex-col lg:flex-row min-h-screen">
-                        {/* Left Column: Content */}
-                        <div className="lg:w-2/3 p-10 lg:p-20 bg-white">
-                            <div className="max-w-3xl mx-auto">
-                                <div className="flex items-center space-x-6 mb-12 pb-8 border-b border-gray-100 font-black text-[9px] text-gray-400 uppercase tracking-widest">
-                                    <div className="flex items-center"><span className="material-icons mr-2 text-indigo-400 text-sm">edit_note</span> AI EDITORIAL TEAM</div>
-                                    <div className="flex items-center"><span className="material-icons mr-2 text-indigo-400 text-sm">schedule</span> {new Date(selectedPost.created_at).toLocaleDateString()}</div>
-                                    <div className="flex items-center"><span className="material-icons mr-2 text-indigo-400 text-sm">history_edu</span> {selectedPost.word_count || 0} WORDS</div>
-                                </div>
-
-                                <h1 className="text-5xl font-black text-gray-900 leading-[1.1] mb-12 tracking-tighter">
-                                    {selectedPost.title && selectedPost.title[0]}
-                                </h1>
-
-                                <div className="markdown-container prose prose-indigo max-w-none">
-                                    <ReactMarkdown
-                                        remarkPlugins={[remarkGfm]}
-                                        components={{
-                                            h1: ({ node, ...props }) => <h1 className="text-4xl font-black text-gray-900 mt-12 mb-6 tracking-tight" {...props} />,
-                                            h2: ({ node, ...props }) => <h2 className="text-2xl font-black text-gray-800 mt-10 mb-5 tracking-tight border-l-4 border-indigo-500 pl-6" {...props} />,
-                                            h3: ({ node, ...props }) => <h3 className="text-xl font-black text-gray-800 mt-8 mb-4 tracking-tight" {...props} />,
-                                            p: ({ node, ...props }) => <p className="text-gray-600 text-lg leading-[1.8] mb-8 font-medium" {...props} />,
-                                            ul: ({ node, ...props }) => <ul className="list-none space-y-4 mb-8 ml-4 border-l-2 border-gray-50 pl-6" {...props} />,
-                                            li: ({ node, ...props }) => (
-                                                <li className="flex items-start text-gray-600 text-lg leading-relaxed" {...props}>
-                                                    <span className="text-indigo-500 mr-3 mt-1.5 material-icons text-[10px]">alternate_email</span>
-                                                    <span>{props.children}</span>
-                                                </li>
-                                            ),
-                                            blockquote: ({ node, ...props }) => (
-                                                <div className="bg-indigo-50/30 border-l-4 border-indigo-500 p-10 my-10 rounded-r-[2.5rem] italic text-indigo-900 text-xl font-medium leading-relaxed shadow-sm" {...props} />
-                                            )
-                                        }}
-                                    >
-                                        {selectedPost.content && selectedPost.content[0]}
-                                    </ReactMarkdown>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Right Column: Research & Meta (Sticky) */}
-                        <div className="lg:w-1/3 bg-gray-50/50 border-l border-gray-100 p-10 lg:p-12 relative">
-                            <div className="sticky top-12 space-y-10">
-                                {/* SEO / Quality Score Card */}
-                                <div className="bg-white rounded-[2rem] p-8 shadow-xl shadow-gray-200/50 border border-gray-100">
-                                    <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-6 border-b pb-4">Authority Score</h4>
-                                    <div className="flex items-end gap-3 mb-6">
-                                        <span className={`text-6xl font-black tracking-tighter ${(selectedPost.seo_data?.score || 0) >= 85 ? 'text-indigo-600' : 'text-orange-500'}`}>
-                                            {selectedPost.seo_data?.score || 0}%
-                                        </span>
-                                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">SEO Score</span>
-                                    </div>
-
-                                    {/* Coverage Score */}
-                                    {selectedPost.seo_data?.coverage_score && (
-                                        <div className="mb-4">
-                                            <div className="flex justify-between mb-1">
-                                                <span className="text-[9px] font-black text-gray-500 uppercase tracking-tight">SERP Coverage</span>
-                                                <span className="text-[9px] font-black text-indigo-600">{selectedPost.seo_data.coverage_score}%</span>
-                                            </div>
-                                            <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                                                <div className="h-full bg-indigo-500 rounded-full transition-all" style={{ width: `${selectedPost.seo_data.coverage_score}%` }}></div>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    <div className="space-y-3">
-                                        <div className="flex justify-between items-center bg-gray-50 p-3 rounded-xl border border-gray-100">
-                                            <span className="text-[9px] font-black text-gray-500 uppercase tracking-tight">Primary Keyword</span>
-                                            <span className="text-[9px] font-black text-indigo-600 uppercase bg-indigo-50 px-2 py-0.5 rounded-full">{selectedPost.seo_data?.focus_keyword || 'N/A'}</span>
-                                        </div>
-                                        <div className="flex justify-between items-center bg-gray-50 p-3 rounded-xl border border-gray-100">
-                                            <span className="text-[9px] font-black text-gray-500 uppercase tracking-tight">Search Intent</span>
-                                            <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${selectedPost.seo_data?.search_intent === 'commercial' ? 'bg-amber-50 text-amber-600' :
-                                                selectedPost.seo_data?.search_intent === 'transactional' ? 'bg-green-50 text-green-600' :
-                                                    'bg-blue-50 text-blue-600'
-                                                }`}>{selectedPost.seo_data?.search_intent || 'Informational'}</span>
-                                        </div>
-                                        {selectedPost.seo_data?.url_slug && (
-                                            <div className="bg-gray-50 p-3 rounded-xl border border-gray-100">
-                                                <span className="text-[9px] font-black text-gray-500 uppercase tracking-tight block mb-1">URL Slug</span>
-                                                <span className="text-[9px] font-mono text-gray-700">/{selectedPost.seo_data.url_slug}</span>
-                                            </div>
-                                        )}
-                                        {selectedPost.seo_data?.meta_description && (
-                                            <div className="bg-gray-50 p-3 rounded-xl border border-gray-100">
-                                                <span className="text-[9px] font-black text-gray-500 uppercase tracking-tight block mb-1">Meta Description</span>
-                                                <span className="text-[9px] text-gray-600 leading-relaxed">{selectedPost.seo_data.meta_description}</span>
-                                            </div>
-                                        )}
-                                        {selectedPost.seo_data?.title_variants && selectedPost.seo_data.title_variants.length > 0 && (
-                                            <div className="bg-gray-50 p-3 rounded-xl border border-gray-100">
-                                                <span className="text-[9px] font-black text-gray-500 uppercase tracking-tight block mb-2">Title Variants</span>
-                                                <div className="space-y-1">
-                                                    {selectedPost.seo_data.title_variants.map((t, i) => (
-                                                        <p key={i} className="text-[9px] text-gray-700 leading-tight pl-2 border-l-2 border-indigo-200">{t}</p>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        )}
-                                        <div className="flex flex-col gap-2 bg-gray-50 p-3 rounded-xl border border-gray-100">
-                                            <span className="text-[9px] font-black text-gray-500 uppercase tracking-tight">Hash Tags</span>
-                                            <div className="flex flex-wrap gap-1">
-                                                {selectedPost.seo_data?.hashtags ? selectedPost.seo_data.hashtags.map((tag, i) => (
-                                                    <span key={i} className="text-[9px] font-black text-gray-700 bg-white border border-gray-200 px-2 py-0.5 rounded-full">{tag}</span>
-                                                )) : <span className="text-[9px] font-black text-gray-400">#not_provided</span>}
-                                            </div>
-                                        </div>
-                                        {selectedPost.seo_data?.coverage_missing && selectedPost.seo_data.coverage_missing.length > 0 && (
-                                            <div className="bg-amber-50 p-3 rounded-xl border border-amber-100">
-                                                <span className="text-[9px] font-black text-amber-600 uppercase tracking-tight block mb-1">Coverage Gaps</span>
-                                                {selectedPost.seo_data.coverage_missing.map((gap, i) => (
-                                                    <p key={i} className="text-[9px] text-amber-700">• {gap}</p>
-                                                ))}
-                                            </div>
-                                        )}
-                                        {selectedPost.seo_data?.internal_link_suggestions && selectedPost.seo_data.internal_link_suggestions.length > 0 && (
-                                            <div className="bg-gray-50 p-3 rounded-xl border border-gray-100">
-                                                <span className="text-[9px] font-black text-gray-500 uppercase tracking-tight block mb-1">Internal Link Ideas</span>
-                                                {selectedPost.seo_data.internal_link_suggestions.map((s, i) => (
-                                                    <p key={i} className="text-[9px] text-gray-600">→ {s}</p>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {/* Research Sources Pane */}
-                                <div>
-                                    <h4 className="text-[10px] font-black text-gray-900 uppercase tracking-[0.2em] mb-6 flex items-center gap-2">
-                                        <i className="material-icons text-indigo-400 text-sm">hub</i> Research Node Links
-                                    </h4>
-                                    <div className="space-y-3">
-                                        {selectedPost.research_sources && selectedPost.research_sources.length > 0 ? (
-                                            selectedPost.research_sources.map((source, idx) => (
-                                                <a
-                                                    key={idx}
-                                                    href={source.url}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="block bg-white border border-gray-100 p-4 rounded-2xl hover:border-indigo-500 hover:shadow-xl hover:shadow-indigo-500/5 transition-all duration-300 group"
-                                                >
-                                                    <div className="flex items-center justify-between mb-2">
-                                                        <span className="text-[8px] font-black text-indigo-500 uppercase tracking-widest bg-indigo-50 px-2 py-0.5 rounded-full">Source {idx + 1}</span>
-                                                        <i className="material-icons text-[12px] text-gray-300 group-hover:text-indigo-500 transition-colors">open_in_new</i>
-                                                    </div>
-                                                    <p className="text-[10px] font-bold text-gray-800 line-clamp-2 leading-relaxed">
-                                                        {source.title || source.url}
-                                                    </p>
-                                                </a>
-                                            ))
-                                        ) : (
-                                            <div className="text-center py-12 bg-white rounded-3xl border-2 border-dashed border-gray-100 italic text-[10px] text-gray-300 font-bold uppercase tracking-widest">
-                                                Sources Baked into Text
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <ArticlePreview
+                post={selectedPost}
+                onBack={() => setSelectedPost(null)}
+                onUpdate={(updated) => {
+                    setSelectedPost(updated);
+                    fetchAllData();
+                }}
+            />
         );
     }
 
@@ -339,9 +175,19 @@ const Posts = () => {
                 {/* Published Posts */}
                 {posts.map((post) => (
                     <div key={post.id} className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 overflow-hidden flex flex-col md:flex-row hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-1">
-                        <div className="md:w-1/3 h-64 md:h-auto bg-gray-50 relative group overflow-hidden flex items-center justify-center">
-                            <div className="absolute inset-0 bg-indigo-600 opacity-0 group-hover:opacity-10 transition-opacity duration-300"></div>
-                            <span className="material-icons text-gray-200 text-8xl group-hover:scale-110 transition-transform duration-500">article</span>
+                        <div className="md:w-1/3 h-64 md:h-auto bg-gray-50 relative group overflow-hidden flex items-center justify-center border-r-[1px] border-gray-50">
+                            {post.image_crm?.[0] ? (
+                                <img
+                                    src={`http://localhost:8080/${post.image_crm[0]}`}
+                                    alt={post.title?.[0]}
+                                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                                />
+                            ) : (
+                                <>
+                                    <div className="absolute inset-0 bg-indigo-600 opacity-0 group-hover:opacity-10 transition-opacity duration-300"></div>
+                                    <span className="material-icons text-gray-200 text-8xl group-hover:scale-110 transition-transform duration-500">article</span>
+                                </>
+                            )}
                         </div>
                         <div className="p-10 md:w-2/3 flex flex-col">
                             <div className="flex justify-between items-start mb-6">
@@ -373,7 +219,19 @@ const Posts = () => {
                                 </div>
                                 <span className="text-[10px] text-gray-400 font-black uppercase tracking-[0.2em]">{new Date(post.created_at || Date.now()).toLocaleDateString()}</span>
                             </div>
-                            <h2 className="text-3xl font-black text-gray-900 mb-6 leading-tight group-hover:text-indigo-600 transition-colors duration-300 tracking-tight">{post.title && post.title[0]}</h2>
+                            <h2 className="text-3xl font-black text-gray-900 mb-2 leading-tight group-hover:text-indigo-600 transition-colors duration-300 tracking-tight">{post.title && post.title[0]}</h2>
+                            <div className="flex flex-wrap items-center gap-3 mb-6">
+                                {post.category && post.category[0] && (
+                                    <span className="bg-indigo-50 text-indigo-700 px-3 py-1 rounded-md text-[9px] font-black uppercase tracking-widest border border-indigo-100">
+                                        {Array.isArray(post.category) ? post.category[0] : post.category}
+                                    </span>
+                                )}
+                                {post.tags && post.tags.length > 0 && post.tags.slice(0, 3).map(tag => (
+                                    <span key={tag} className="text-[9px] font-bold text-gray-400 uppercase tracking-widest bg-gray-50 px-2 py-1 rounded-md border border-gray-100">
+                                        #{tag}
+                                    </span>
+                                ))}
+                            </div>
                             <p className="text-gray-500 text-sm mb-10 line-clamp-3 leading-relaxed font-medium">
                                 {post.content && post.content[0]?.replace(/[#*`>]/g, '').substring(0, 240)}...
                             </p>
@@ -387,32 +245,50 @@ const Posts = () => {
                                         Publish to Live Blog
                                     </button>
                                 ) : (
-                                    <div className="bg-emerald-50 text-emerald-600 px-6 py-4 rounded-2xl border border-emerald-100 flex items-center gap-2">
-                                        <i className="material-icons text-sm">check_circle</i>
-                                        <span className="text-[10px] font-black uppercase tracking-widest">Live on Blog</span>
+                                    <div className="flex items-center gap-2">
+                                        <div className="bg-emerald-50 text-emerald-600 px-6 py-4 rounded-2xl border border-emerald-100 flex items-center gap-2">
+                                            <i className="material-icons text-sm">check_circle</i>
+                                            <span className="text-[10px] font-black uppercase tracking-widest">Live on Blog</span>
+                                        </div>
+                                        <button
+                                            onClick={() => handleUnpublish(post.id)}
+                                            className="border-2 border-red-100 hover:border-red-300 text-red-500 hover:text-red-600 hover:bg-red-50 font-black py-4 px-6 rounded-2xl transition-all duration-300 text-[10px] uppercase tracking-widest flex items-center gap-2"
+                                            title="Unpublish Post"
+                                        >
+                                            <i className="material-icons text-sm">unpublished</i>
+                                        </button>
                                     </div>
                                 )}
-                                <button
-                                    onClick={() => setSelectedPost(post)}
-                                    className="bg-gray-900 hover:bg-black text-white font-black py-4 px-8 rounded-2xl transition-all duration-300 shadow-xl shadow-gray-200 text-[10px] uppercase tracking-widest active:scale-95 flex items-center gap-2"
-                                >
-                                    <i className="material-icons text-sm">visibility</i>
-                                    Review Data
-                                </button>
-                                <button
-                                    onClick={() => setEditingPost(post)}
-                                    className="border-2 border-gray-100 hover:border-indigo-100 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 font-black py-4 px-8 rounded-2xl transition-all duration-300 text-[10px] uppercase tracking-widest flex items-center gap-2"
-                                >
-                                    <i className="material-icons text-sm">edit</i>
-                                    Refine
-                                </button>
-                                <button
-                                    onClick={() => setRetryModal({ postId: post.id, topic: post.title?.[0] || 'Post' })}
-                                    className="border-2 border-orange-100 hover:border-orange-300 text-orange-400 hover:text-orange-600 hover:bg-orange-50 font-black py-4 px-8 rounded-2xl transition-all duration-300 text-[10px] uppercase tracking-widest flex items-center gap-2"
-                                >
-                                    <i className="material-icons text-sm">replay</i>
-                                    Rerun
-                                </button>
+                                <div className="flex gap-2 ml-auto">
+                                    <button
+                                        onClick={() => setSelectedPost(post)}
+                                        className="w-12 h-12 flex items-center justify-center bg-gray-900 hover:bg-black text-white rounded-2xl transition-all duration-300 shadow-xl shadow-gray-200 active:scale-95"
+                                        title="View Review Data"
+                                    >
+                                        <i className="material-icons text-lg">visibility</i>
+                                    </button>
+                                    <button
+                                        onClick={() => setEditingPost(post)}
+                                        className="w-12 h-12 flex items-center justify-center border-2 border-gray-100 hover:border-indigo-100 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-2xl transition-all duration-300"
+                                        title="Refine Post"
+                                    >
+                                        <i className="material-icons text-lg">edit</i>
+                                    </button>
+                                    <button
+                                        onClick={() => setRetryModal({ postId: post.id, topic: post.title?.[0] || 'Post' })}
+                                        className="w-12 h-12 flex items-center justify-center border-2 border-orange-100 hover:border-orange-300 text-orange-400 hover:text-orange-600 hover:bg-orange-50 rounded-2xl transition-all duration-300"
+                                        title="Rerun Generation"
+                                    >
+                                        <i className="material-icons text-lg">replay</i>
+                                    </button>
+                                    <button
+                                        onClick={() => handleDelete(post.id)}
+                                        className="w-12 h-12 flex items-center justify-center border-2 border-gray-100 hover:border-red-100 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-2xl transition-all duration-300"
+                                        title="Delete Post"
+                                    >
+                                        <i className="material-icons text-lg">delete</i>
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -428,6 +304,7 @@ const Posts = () => {
                             <div>
                                 <label className="text-xs font-black text-gray-400 uppercase tracking-widest block mb-1">Article Title</label>
                                 <input
+                                    id="edit-title-input"
                                     type="text"
                                     defaultValue={editingPost.title && editingPost.title[0]}
                                     className="w-full bg-gray-50 border border-gray-100 rounded-xl p-4 font-bold text-gray-800"
@@ -436,6 +313,7 @@ const Posts = () => {
                             <div>
                                 <label className="text-xs font-black text-gray-400 uppercase tracking-widest block mb-1">Body Content (HTML Supported)</label>
                                 <textarea
+                                    id="edit-content-input"
                                     rows="12"
                                     defaultValue={editingPost.content && editingPost.content[0]}
                                     className="w-full bg-gray-50 border border-gray-100 rounded-xl p-4 font-medium text-gray-700 font-serif leading-relaxed"

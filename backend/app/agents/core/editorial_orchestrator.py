@@ -6,12 +6,14 @@ from app.agents.research.aggregator_agent import AggregatorAgent
 from app.agents.research.credibility_agent import CredibilityAgent
 from app.agents.strategy.intent_agent import IntentAgent
 from app.agents.strategy.keyword_cluster_agent import KeywordClusterAgent
-from app.agents.writing.draft_agent import DraftAgent
+from app.agents.writing.writer_agent import WriterAgent
 from app.agents.writing.voice_agent import VoiceAgent
 from app.agents.improvement.seo_agent import SEOAgent
 from app.agents.improvement.readability_agent import ReadabilityAgent
 from app.agents.improvement.originality_agent import OriginalityAgent
 from app.agents.governance.legal_agent import LegalAgent
+from app.agents.writing.category_agent import CategoryAgent
+from app.agents.writing.hashtag_agent import HashtagAgent
 from app.agents.core.evaluator import EvaluationAgent
 from app.agents.core.dataset_agent import DatasetAgent
 from app.agents.writing.image_agent import ImageAgent
@@ -26,7 +28,7 @@ class EditorialOrchestrator(Orchestrator):
         self.register_agent("credibility", CredibilityAgent())
         self.register_agent("keyword_cluster", KeywordClusterAgent())
         self.register_agent("intent", IntentAgent())
-        self.register_agent("draft", DraftAgent())
+        self.register_agent("writer", WriterAgent())
         self.register_agent("voice", VoiceAgent())
         self.register_agent("seo", SEOAgent())
         self.register_agent("readability", ReadabilityAgent())
@@ -35,6 +37,8 @@ class EditorialOrchestrator(Orchestrator):
         self.register_agent("evaluator", EvaluationAgent())
         self.register_agent("dataset", DatasetAgent())
         self.register_agent("image", ImageAgent())
+        self.register_agent("category", CategoryAgent())
+        self.register_agent("hashtag", HashtagAgent())
 
     async def run_editorial_workflow(self, db, topic_id: Optional[int] = None, user_topic: Optional[str] = None, target_audience: str = "General", task_id: Optional[str] = None, include_images: bool = False, reuse_scrape: bool = False):
         """
@@ -124,8 +128,8 @@ class EditorialOrchestrator(Orchestrator):
                 progress.preview_data = preview
                 db.commit()
 
-        # Layer 4: Writing (Now with 1200+ word enforcement)
-        await self.execute_task("draft", self.state)
+        # Layer 4: Writing (Now handles both long-form and short-form)
+        await self.execute_task("writer", self.state)
         
         # UI SCAFFOLDING: Update Outline Preview
         if task_id:
@@ -149,6 +153,10 @@ class EditorialOrchestrator(Orchestrator):
         await self.execute_task("seo", self.state)
         await self.execute_task("readability", self.state)
         await self.execute_task("originality", self.state)
+        
+        # Categorization & Social Tags
+        cat_result = await self.execute_task("category", self.state)
+        hash_result = await self.execute_task("hashtag", self.state)
 
         # Layer 6: Governance
         await self.execute_task("legal", self.state)
@@ -171,9 +179,11 @@ class EditorialOrchestrator(Orchestrator):
                 content=[final_draft],
                 status="Draft",
                 word_count=word_count,
+                category=[self.state.get("category", "Intelligence")],
+                tags=self.state.get("tags", []),
                 seo_data={
                     "focus_keyword": focus_meta,
-                    "hashtags": hashtags,
+                    "hashtags": self.state.get("tags", hashtags),
                     "word_count": word_count,
                     "score": seo_score
                 },

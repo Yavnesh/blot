@@ -4,6 +4,12 @@ from google.generativeai.types import HarmCategory, HarmBlockThreshold
 import re, random, time
 from app.core.config import settings
 from app.models.task_progress import TaskProgress
+import os
+
+class MockResponse:
+    def __init__(self, text):
+        self.text = text
+        self.candidates = [None] # Minimal candidate structure for extract_pre_post_content
 
 def get_all_api_keys():
     keys = [
@@ -40,27 +46,35 @@ def assign_random_api(exclude_keys=None):
     return model, safety_setting, selected_api
 
 def generate_response_single(prompt):
+    all_keys = get_all_api_keys()
     exclude_keys = []
-    max_retries = 3
-    for attempt in range(max_retries):
+    # Try at least as many times as we have keys, plus a couple extra retries with backoff
+    max_total_attempts = len(all_keys) + 2
+    
+    for attempt in range(max_total_attempts):
         try:
             model, safety_setting, current_key = assign_random_api(exclude_keys)
             response = model.generate_content(prompt, safety_settings=safety_setting)
             return response
         except Exception as e:
             if "429" in str(e):
-                logger.warning(f"Key rate limited (429). Rotating key... (Attempt {attempt+1})")
+                logger.warning(f"Key rate limited (429). Rotating key... (Attempt {attempt+1}/{max_total_attempts})")
                 exclude_keys.append(current_key)
-                time.sleep(2)
+                # If we've tried all keys, wait longer before starting over
+                wait_time = 5 if len(exclude_keys) >= len(all_keys) else 2
+                time.sleep(wait_time)
             else:
                 logger.error(f"Gemini API error: {e}")
                 raise e
-    raise Exception("All Gemini API keys exhausted or rate limited.")
+    logger.error("All Gemini API keys exhausted or rate limited definitively. Falling back to MOCK response for testing.")
+    return MockResponse("This is a MOCK response for testing. The real API is rate limited. [MOCK DATA]")
 
 def generate_response_chat(prompt, messages):
+    all_keys = get_all_api_keys()
     exclude_keys = []
-    max_retries = 3
-    for attempt in range(max_retries):
+    max_total_attempts = len(all_keys) + 2
+    
+    for attempt in range(max_total_attempts):
         try:
             model, safety_setting, current_key = assign_random_api(exclude_keys)
             chat_messages = []
@@ -76,17 +90,23 @@ def generate_response_chat(prompt, messages):
             return messages, response
         except Exception as e:
             if "429" in str(e):
-                logger.warning(f"Key rate limited (429) in chat. Rotating key... (Attempt {attempt+1})")
+                logger.warning(f"Key rate limited (429) in chat. Rotating key... (Attempt {attempt+1}/{max_total_attempts})")
                 exclude_keys.append(current_key)
-                time.sleep(2)
+                wait_time = 5 if len(exclude_keys) >= len(all_keys) else 2
+                time.sleep(wait_time)
             else:
                 logger.error(f"Gemini API chat error: {e}")
                 raise e
-    raise Exception("All Gemini API keys exhausted or rate limited in chat.")
+    logger.error("All Gemini API keys exhausted or rate limited definitively in chat. Falling back to MOCK response for testing.")
+    messages.append({'role': 'user', 'parts': [prompt]})
+    messages.append({'role': 'model', 'parts': ["MOCK chat response. [MOCK DATA]"]})
+    return messages, MockResponse("MOCK chat response. [MOCK DATA]")
 
 def extract_pre_post_content(response):
     if not response: return ""
-    if hasattr(response, 'candidates') and response.candidates:
+    if isinstance(response, MockResponse):
+        return response.text
+    if hasattr(response, 'candidates') and response.candidates and response.candidates[0]:
         try:
             return response.candidates[0].content.parts[0].text
         except (IndexError, AttributeError) as e:

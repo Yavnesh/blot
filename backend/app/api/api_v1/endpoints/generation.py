@@ -68,19 +68,21 @@ async def trigger_pipeline(
     db.add(progress)
     db.commit()
     
-    service = BlogGeneratorService(db)
-    background_tasks.add_task(
-        service.run_full_pipeline,
-        limit=limit,
-        topic_id=topic_id,
-        user_topic=user_topic,
-        post_id=post_id,
-        task_id=task_id,
-        include_images=include_images,
-        reuse_scrape=reuse_scrape
-    )
+    # Trigger Celery Task (Replaces FastAPI BackgroundTasks)
+    from app.modules.orchestrator.service.pipeline_tasks import execute_seo_pipeline_task
     
-    return {"message": "Pipeline triggered", "task_id": task_id, "topic": topic_name}
+    initial_state = {
+        "topic_id": topic_id,
+        "user_topic": user_topic,
+        "post_id": post_id,
+        "include_images": include_images,
+        "reuse_scrape": reuse_scrape,
+        "task_id": task_id
+    }
+    
+    execute_seo_pipeline_task.delay(job_id=task_id, initial_state=initial_state)
+    
+    return {"message": "Pipeline triggered via Celery", "task_id": task_id, "topic": topic_name}
 
 @router.get("/status/{task_id}", response_model=dict)
 async def get_task_status(

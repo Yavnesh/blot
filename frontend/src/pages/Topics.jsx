@@ -41,66 +41,77 @@ const InlineAgentStatus = ({ taskId, taskData }) => {
 
     if (!status) return null;
 
+    const TOTAL_AGENTS = 12;
+    const completedSteps = status.steps?.filter(s => ['completed', 'success', 'warning'].includes(s.status)) || [];
+    const errorSteps = status.steps?.filter(s => s.status === 'error') || [];
+    const runningSteps = status.steps?.filter(s => s.status === 'running') || [];
+
+    // If the orchestrator finished perfectly or failed, we set bar accordingly.
+    const isFullyCompleted = status.status === 'completed';
+    const isFailed = status.status === 'error';
+
+    // Calculate progress based on steps vs TOTAL_AGENTS. If fully completed, jump to 100.
+    const processedCount = completedSteps.length + errorSteps.length;
+    const progressPercent = isFullyCompleted ? 100 : Math.min(100, Math.round((processedCount / TOTAL_AGENTS) * 100));
+
     return (
         <div className="mt-6 space-y-6">
             {/* Live Counter for Research Layer */}
             {status.preview_data?.fact_count > 0 && (
-                <div className="bg-indigo-600 rounded-2xl p-5 text-white shadow-xl shadow-indigo-200">
-                    <div className="flex justify-between items-center mb-3">
-                        <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80">Research Node Pool</span>
+                <div className="bg-slate-900 rounded-2xl p-5 text-white shadow-2xl relative overflow-hidden">
+                    <div className="absolute -right-4 -top-4 opacity-10">
+                        <i className="material-icons text-7xl">account_tree</i>
+                    </div>
+                    <div className="flex justify-between items-center mb-3 relative z-10">
+                        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-300">Research Node Pool</span>
                         <div className="flex -space-x-2">
                             {[...Array(Math.min(status.preview_data.fact_count, 5))].map((_, i) => (
-                                <div key={i} className="w-6 h-6 rounded-full bg-white/20 border-2 border-indigo-600 flex items-center justify-center text-[8px] font-black backdrop-blur-sm">
-                                    <i className="material-icons text-[10px]">link</i>
+                                <div key={i} className="w-6 h-6 rounded-full bg-slate-800 border border-indigo-500/30 flex items-center justify-center text-[8px] font-black backdrop-blur-sm">
+                                    <i className="material-icons text-[10px] text-indigo-400">link</i>
                                 </div>
                             ))}
                             {status.preview_data.fact_count > 5 && (
-                                <div className="w-6 h-6 rounded-full bg-indigo-400 border-2 border-indigo-600 flex items-center justify-center text-[8px] font-black">+{status.preview_data.fact_count - 5}</div>
+                                <div className="w-6 h-6 rounded-full bg-indigo-500/20 border border-indigo-400/50 flex items-center justify-center text-[8px] font-black text-indigo-300">+{status.preview_data.fact_count - 5}</div>
                             )}
                         </div>
                     </div>
-                    <div className="flex items-end gap-2">
+                    <div className="flex items-end gap-2 relative z-10">
                         <span className="text-3xl font-black">{status.preview_data.fact_count}</span>
-                        <span className="text-[10px] font-black uppercase tracking-widest mb-1.5">Sources Verified</span>
+                        <span className="text-[10px] font-black uppercase tracking-widest mb-1.5 text-slate-400">Sources Verified</span>
                     </div>
                 </div>
             )}
 
             {/* Live Scaffolding Preview */}
             {(status.preview_data?.headline || status.preview_data?.outline) && (
-                <div className="bg-white border-2 border-indigo-50 rounded-[2rem] p-6 shadow-sm relative overflow-hidden group/scaffold">
+                <div className="bg-[#f8f9fc] border border-slate-200 rounded-[2rem] p-6 shadow-inner relative group/scaffold">
                     <div className="absolute top-0 right-0 p-3">
-                        <span className="text-[8px] font-black text-indigo-400 uppercase tracking-widest bg-indigo-50 px-2 py-1 rounded-full">Scaffolding Active</span>
+                        <span className="text-[7px] font-black text-slate-500 uppercase tracking-widest bg-white border border-slate-200 px-2 py-1 rounded-full shadow-sm">Scaffolding</span>
                     </div>
-                    <h4 className="text-[9px] font-black text-indigo-600 uppercase tracking-widest mb-3 flex items-center gap-2">
+                    <h4 className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
                         <i className="material-icons text-[12px]">draw</i> Dynamic Preview
                     </h4>
                     {status.preview_data.headline && (
-                        <h5 className="text-sm font-black text-gray-900 mb-2 leading-tight pr-8 capitalize">{status.preview_data.headline}</h5>
+                        <h5 className="text-sm font-black text-slate-900 mb-2 leading-tight pr-8 capitalize">{status.preview_data.headline}</h5>
                     )}
                     {(status.preview_data.primary_keyword || status.preview_data.search_intent) && (
                         <div className="flex flex-wrap gap-1.5 mb-2">
                             {status.preview_data.primary_keyword && (
-                                <span className="text-[8px] font-black bg-indigo-600 text-white px-2 py-0.5 rounded-full uppercase tracking-wider">
+                                <span className="text-[8px] font-black bg-slate-800 text-white px-2 py-0.5 rounded-full uppercase tracking-wider">
                                     🔑 {status.preview_data.primary_keyword}
                                 </span>
                             )}
                             {status.preview_data.search_intent && (
-                                <span className="text-[8px] font-black bg-white border border-indigo-200 text-indigo-600 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                                <span className="text-[8px] font-black bg-white border border-slate-200 text-slate-600 px-2 py-0.5 rounded-full uppercase tracking-wider shadow-sm">
                                     {status.preview_data.search_intent}
                                 </span>
                             )}
                         </div>
                     )}
                     {status.preview_data.outline && (
-                        <p className="text-[11px] text-gray-500 font-medium leading-relaxed italic line-clamp-2">
+                        <p className="text-[11px] text-slate-500 font-medium leading-relaxed italic line-clamp-2 mt-3 p-3 bg-white rounded-xl border border-slate-100">
                             {status.preview_data.outline}
                         </p>
-                    )}
-                    {status.preview_data.seo_score && (
-                        <div className="absolute bottom-[-10px] right-3 p-3">
-                            <span className="text-[10px] font-black text-white bg-indigo-600 px-3 py-1 rounded-full shadow-lg border border-indigo-400">Authority Score: {status.preview_data.seo_score}%</span>
-                        </div>
                     )}
                 </div>
             )}
@@ -109,51 +120,68 @@ const InlineAgentStatus = ({ taskId, taskData }) => {
             <div className="space-y-4 px-1">
                 <div className="flex items-center justify-between mb-2">
                     <div className="flex gap-3 items-center">
-                        <span className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em]">Agent Mesh Progress</span>
-                        {status.steps && (
-                            <span className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full ring-1 ring-indigo-200 shadow-sm animate-pulse">
-                                {Math.round((status.steps.filter(s => s.status === 'completed').length / status.steps.length) * 100)}%
-                            </span>
-                        )}
+                        <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em]">Agent Mesh Progress</span>
+                        <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ring-1 shadow-sm ${isFailed ? 'text-red-600 bg-red-50 ring-red-200' : isFullyCompleted ? 'text-emerald-600 bg-emerald-50 ring-emerald-200' : 'text-indigo-600 bg-indigo-50 ring-indigo-200 animate-pulse'}`}>
+                            {progressPercent}%
+                        </span>
                     </div>
-                    <span className={`text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full ${status.status === 'completed' ? 'bg-green-50 text-green-600' :
-                        status.status === 'error' ? 'bg-red-50 text-red-600' : 'bg-indigo-50 text-indigo-600 animate-pulse'
+                    <span className={`text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full shadow-sm border ${isFullyCompleted ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                        isFailed ? 'bg-red-50 text-red-600 border-red-100' : 'bg-white border-indigo-100 text-indigo-600 animate-pulse'
                         }`}>
-                        {status.status === 'completed' ? 'Finished' : status.status === 'error' ? 'Failed' : `Running: ${status.current_step || 'Orchestrating'}`}
+                        {isFullyCompleted ? 'Finished' : isFailed ? 'Failed' : `Running: ${status.current_step || 'Orchestrating'}`}
                     </span>
                 </div>
 
-                <div className="flex gap-1.5 h-1.5 bg-gray-100 rounded-full overflow-hidden mb-3">
+                <div className="flex gap-1.5 h-2 bg-slate-100 rounded-full overflow-hidden mb-3 border border-slate-200/50 shadow-inner">
                     <div
-                        className={`h-full transition-all duration-700 rounded-full ${status.status === 'completed' ? 'bg-indigo-600' : status.status === 'error' ? 'bg-red-500' : 'bg-indigo-500 loading-stripes'}`}
-                        style={{ width: `${Math.round(((status.steps?.filter(s => s.status === 'completed').length || 0) / (status.steps?.length || 1)) * 100)}%` }}
+                        className={`h-full transition-all duration-700 rounded-full ${isFullyCompleted ? 'bg-emerald-500' : isFailed ? 'bg-red-500' : 'bg-indigo-500 loading-stripes'}`}
+                        style={{ width: `${progressPercent}%` }}
                     ></div>
                 </div>
 
-                <div className="flex flex-col gap-1 text-[9px] font-medium text-gray-500">
-                    {status.steps && status.steps.filter(s => s.status === 'completed').length > 0 && (
-                        <div className="flex items-start gap-1">
-                            <i className="material-icons text-[10px] text-green-500 mt-0.5">check_circle</i>
-                            <span className="leading-tight">
-                                <span className="font-bold text-gray-700">Completed:</span>{' '}
-                                {status.steps.filter(s => s.status === 'completed').map(s => s.name).join(', ')}
-                            </span>
-                        </div>
-                    )}
-                    {status.steps && status.steps.filter(s => s.status === 'running').length > 0 && (
-                        <div className="flex items-start gap-1">
-                            <i className="material-icons text-[10px] text-indigo-500 animate-spin mt-0.5">sync</i>
-                            <span className="leading-tight text-indigo-700">
-                                <span className="font-bold">Running:</span>{' '}
-                                {status.steps.filter(s => s.status === 'running').map(s => s.name).join(', ')}
-                            </span>
-                        </div>
-                    )}
+                <div className="mt-4 bg-slate-50/50 rounded-xl border border-slate-100 p-3 flex flex-col gap-1.5 max-h-48 overflow-y-auto custom-scrollbar">
+                    {['trend', 'credibility', 'semantic', 'intent', 'aggregator', 'draft', 'seo', 'voice', 'readability', 'category', 'hashtag', 'image', 'evaluator'].map(stepName => {
+                        const stepInfo = status.steps?.find(s => s.name.toLowerCase() === stepName);
+                        let stateColor = 'text-slate-300';
+                        let icon = 'radio_button_unchecked';
+                        let timeText = '';
+                        let spin = false;
+
+                        if (stepInfo) {
+                            if (['completed', 'success', 'warning'].includes(stepInfo.status)) {
+                                stateColor = 'text-emerald-500';
+                                icon = 'check_circle';
+                                timeText = formatDuration(stepInfo.start_time, stepInfo.end_time);
+                            } else if (stepInfo.status === 'error') {
+                                stateColor = 'text-red-500';
+                                icon = 'error';
+                            } else if (stepInfo.status === 'running') {
+                                stateColor = 'text-indigo-500';
+                                icon = 'sync';
+                                spin = true;
+                                timeText = 'Running...';
+                            }
+                        }
+
+                        return (
+                            <div key={stepName} className="flex items-center justify-between text-[9px] uppercase tracking-widest p-1.5 hover:bg-white rounded-lg transition-colors border border-transparent hover:border-slate-100 shadow-sm hover:shadow-md">
+                                <div className="flex items-center gap-2">
+                                    <i className={`material-icons text-[12px] ${stateColor} ${spin ? 'animate-spin' : ''}`}>{icon}</i>
+                                    <span className={stepInfo?.status === 'running' ? 'text-indigo-700 font-black' : stepInfo?.status === 'error' ? 'text-red-600 font-black' : stepInfo ? 'text-slate-700 font-bold' : 'text-slate-400 font-medium'}>
+                                        {stepName} Agent
+                                    </span>
+                                </div>
+                                <div className={`text-[8px] font-black ${spin ? 'text-indigo-400 animate-pulse' : 'text-slate-400'}`}>
+                                    {timeText || '--'}
+                                </div>
+                            </div>
+                        );
+                    })}
                 </div>
 
                 {status.logs && status.logs.length > 0 && (
-                    <div className="flex items-center gap-2 text-[10px] font-bold text-gray-400 pt-2 border-t border-gray-50 mt-2">
-                        <i className="material-icons text-[14px] text-indigo-300">psychology</i>
+                    <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 pt-4 border-t border-slate-100 mt-4">
+                        <i className="material-icons text-[14px] text-indigo-400">psychology</i>
                         <span className="truncate italic">"{status.logs[status.logs.length - 1].feedback || 'Processing intent...'}"</span>
                     </div>
                 )}
@@ -292,9 +320,9 @@ const Topics = () => {
                     const isProcessing = taskId && (latestTask?.status === 'running' || generatingTopics[topic.id]);
 
                     return (
-                        <div id={`topic-${topic.id}`} key={topic.id} className={`bg-white rounded-[2.5rem] shadow-sm hover:shadow-2xl transition-all duration-500 overflow-hidden border border-gray-100 flex flex-col group relative ${isProcessing ? 'ring-2 ring-indigo-500 ring-offset-4 ring-offset-gray-50 bg-indigo-50/5' : ''}`}>
+                        <div id={`topic-${topic.id}`} key={topic.id} className={`bg-white rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_20px_40px_rgb(0,0,0,0.08)] transition-all duration-500 overflow-hidden border border-slate-100 flex flex-col group relative ${isProcessing ? 'ring-2 ring-indigo-500 ring-offset-4 ring-offset-slate-50 bg-indigo-50/10' : ''}`}>
                             {isProcessing && (
-                                <div className="absolute top-0 right-0 p-4">
+                                <div className="absolute top-0 right-0 p-4 z-10">
                                     <div className="flex items-center gap-2 bg-indigo-600 text-white px-3 py-1 rounded-full animate-pulse shadow-lg">
                                         <div className="w-1.5 h-1.5 bg-white rounded-full animate-ping"></div>
                                         <span className="text-[8px] font-black uppercase tracking-widest">Processing Node</span>
@@ -304,30 +332,31 @@ const Topics = () => {
                             <div className="p-8 pb-4 flex-1">
                                 <div className="flex items-center justify-between mb-6">
                                     <div className="flex gap-2 items-center">
-                                        <span className="text-[10px] font-black text-gray-400 mr-2">#{topic.id}</span>
-                                        <span className={`px-4 py-1.5 rounded-full text-[9px] font-black tracking-widest uppercase border shadow-sm ${topic.status === 'New' ? 'bg-green-50 text-green-600 border-green-100' : 'bg-indigo-50 text-indigo-600 border-indigo-100'
+                                        <span className="text-[10px] font-black text-slate-400 mr-2 bg-slate-50 px-2 py-1 rounded-lg">#{typeof topic.id === 'string' && topic.id.startsWith('pseudo') ? 'SYS' : topic.id}</span>
+                                        <span className={`px-4 py-1 rounded-full text-[8px] font-black tracking-widest uppercase border shadow-sm ${topic.status === 'New' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-indigo-50 text-indigo-600 border-indigo-100'
                                             }`}>
                                             {topic.status}
                                         </span>
                                         {topic.trend_score > 0 && (
-                                            <span className="bg-orange-50 text-orange-600 border border-orange-100 px-4 py-1.5 rounded-full text-[9px] font-black tracking-widest uppercase">
-                                                {topic.trend_score} Score
+                                            <span className="bg-amber-50 text-amber-600 border border-amber-100 px-4 py-1 rounded-full text-[8px] font-black tracking-widest uppercase">
+                                                {topic.trend_score} Trend Score
                                             </span>
                                         )}
                                     </div>
-                                    <span className="text-[10px] text-gray-300 font-black uppercase tracking-widest">{new Date(topic.created_at).toLocaleDateString()}</span>
+                                    <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest bg-slate-50 px-3 py-1 rounded-full">{new Date(topic.created_at).toLocaleDateString()}</span>
                                 </div>
 
-                                <h2 className="text-2xl font-black text-gray-900 mb-4 leading-tight group-hover:text-indigo-600 transition-colors duration-300">{topic.topic}</h2>
+                                <h2 className="text-2xl font-black text-slate-900 mb-4 leading-snug group-hover:text-indigo-600 transition-colors duration-300 tracking-tight">{topic.topic}</h2>
 
-                                <div className="flex items-center text-gray-400 text-[10px] font-black uppercase tracking-widest mb-6 px-1">
-                                    <span className="material-icons text-[14px] mr-2 text-indigo-300">hub</span> {topic.source}
+                                <div className="flex items-center text-slate-500 text-[10px] font-black uppercase tracking-widest mb-6 px-1">
+                                    <span className="material-icons text-[14px] mr-2 text-indigo-300">hub</span>
+                                    <span className="opacity-80">{topic.source}</span>
                                 </div>
 
                                 {topic.related_topics_top && topic.related_topics_top.length > 0 && (
                                     <div className="flex flex-wrap gap-2 mb-6">
                                         {topic.related_topics_top.slice(0, 4).map((tag, idx) => (
-                                            <span key={idx} className="bg-gray-50 text-gray-400 text-[9px] font-black px-3 py-1.5 rounded-xl uppercase tracking-tighter border border-gray-100 group-hover:border-indigo-100 transition-colors">
+                                            <span key={idx} className="bg-slate-50/80 text-slate-500 text-[9px] font-black px-3 py-1.5 rounded-xl uppercase tracking-tighter border border-slate-100 group-hover:border-indigo-100/50 group-hover:bg-indigo-50/30 transition-colors">
                                                 #{tag}
                                             </span>
                                         ))}
@@ -343,22 +372,26 @@ const Topics = () => {
                                 )}
                             </div>
 
-                            <div className="px-8 py-6 bg-gray-50/30 border-t border-gray-50 mt-auto flex gap-3">
+                            <div className="px-8 py-6 bg-slate-50/50 border-t border-slate-100 mt-auto flex gap-3">
                                 <button
                                     onClick={() => handleCreatePost(topic)}
-                                    className={`flex-1 font-black py-4 rounded-2xl transition-all duration-300 text-[11px] uppercase tracking-widest shadow-xl active:scale-[0.98] ${taskId ? 'bg-white border-2 border-gray-100 text-gray-400' : 'bg-gray-900 hover:bg-black text-white shadow-gray-200'
+                                    className={`flex-1 font-black py-4 rounded-2xl transition-all duration-300 text-[10px] uppercase tracking-widest active:scale-[0.98] ${taskId ? 'bg-white border-2 border-slate-200 text-slate-400 shadow-sm' : 'bg-slate-900 hover:bg-indigo-600 text-white shadow-xl shadow-slate-900/10'
                                         }`}
                                     disabled={!!taskId && (latestTask?.status === 'running' || generatingTopics[topic.id])}
                                 >
-                                    {taskId && (latestTask?.status === 'running' || generatingTopics[topic.id]) ? '◈ Pipeline Running' : 'Create Authority Post'}
+                                    {taskId && (latestTask?.status === 'running' || generatingTopics[topic.id]) ? (
+                                        <div className="flex items-center justify-center gap-2">
+                                            <i className="material-icons text-[14px] animate-spin">sync</i> ORCHESTRATING...
+                                        </div>
+                                    ) : 'Create Authority Post'}
                                 </button>
-                                {latestTask?.status === 'completed' && (
+                                {(latestTask?.status === 'completed' || latestTask?.status === 'error') && (
                                     <button
                                         onClick={() => setRetryModal({ topicId: topic.id, topicName: topic.topic })}
                                         title="Rerun pipeline for this topic"
-                                        className="w-12 h-12 mt-auto flex items-center justify-center rounded-2xl border-2 border-orange-100 text-orange-400 hover:bg-orange-50 hover:border-orange-300 transition-all"
+                                        className="w-14 h-14 mt-auto flex items-center justify-center rounded-2xl border-2 border-amber-100 text-amber-500 hover:bg-amber-50 hover:border-amber-300 bg-white transition-all shadow-sm"
                                     >
-                                        <i className="material-icons text-sm">replay</i>
+                                        <i className="material-icons text-lg">replay</i>
                                     </button>
                                 )}
                             </div>

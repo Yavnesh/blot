@@ -1,76 +1,116 @@
-# Tews CRM - Django to FastAPI Migration
+# TEWS Intelligence Engine - Autonomous Editorial Discovery
 
-This project is a migration of the original Tews CRM from Django to a modern FastAPI backend with a React frontend.
+The **TEWS Intelligence Engine** is a state-of-the-art AI-driven platform that automates the entire lifecycle of professional content creation—from real-time trend discovery to premium publishing.
 
-## Project Structure
-- `backend/`: FastAPI application using Clean Architecture.
-- `frontend/`: React application using Vite and Tailwind CSS.
+## 🏗️ System Architecture & Port Map
+
+The system runs as a coordinated suite of services:
+
+| Port | Service | Purpose | Description |
+| :--- | :--- | :--- | :--- |
+| **8080** | **Backend API** | Core Engine | FastAPI server handling agent orchestration, API requests, and database logic. |
+| **5173** | **Admin CMS** | Internal Management | Internal dashboard for editorial teams to track pipelines, view trends, and manage content. |
+| **5174** | **Public Blog** | Reader Platform | Premium NYT-style blog site where content is consumed and SEO SaaS tools are hosted. |
+| **5432** | **PostgreSQL** | Database | Persistent storage for research data and semantic vectors (pgvector). |
+| **6379** | **Redis** | Task Queue | Message broker for Celery to handle long-running autonomous editorial jobs. |
+| **9090** | **Metrics** | Observability | Prometheus endpoint for tracking agent latency, LLM costs, and error rates. |
+| **N/A** | **Celery Worker** | Execution Engine | Background worker that runs the multi-agent editorial workflows asynchronously. |
 
 ---
 
 ## 🚀 Getting Started
 
-### 1. Backend Setup (FastAPI)
+## 🚀 Local Development & Testing
 
-1.  **Navigate to backend**:
-    ```bash
-    cd backend
-    ```
-2.  **Create and activate virtual environment**:
-    ```bash
-    python3 -m venv venv
-    source venv/bin/activate
-    ```
-3.  **Install dependencies**:
-    ```bash
-    pip install -r requirements.txt
-    ```
-4.  **Configure Environment**:
-    Update `app/core/config.py` with your API keys:
-    - `GEMINI_API_KEY_1-3`
-    - `STABLE_HORDE_API_KEY`
-    - `TWITTER_API_KEYS`
-5.  **Run the server**:
-    ```bash
-    python3 -m uvicorn app.main:app --reload --port 8000
-    ```
+Follow these steps to spin up the full environment for local testing and verification.
 
-**API Documentation**:
-- Swagger UI: [http://localhost:8000/docs](http://localhost:8000/docs)
-- Redoc: [http://localhost:8000/redoc](http://localhost:8000/redoc)
+### 1. Start Infrastructure (Required)
+Ensure PostgreSQL and Redis are active. On macOS with Homebrew:
+```bash
+brew services start postgresql@14
+brew services start redis
+```
+Verify the DB has the `vector` extension and the `tews` database:
+```bash
+psql tews -c "CREATE EXTENSION IF NOT EXISTS vector;"
+```
+
+### 2. Backend Engine Setup
+Each command should ideally run in its own terminal tab:
+
+**A. Dependency Installation:**
+```bash
+cd backend
+python3 -m venv venv && source venv/bin/activate
+pip install -r requirements.txt
+```
+
+**B. Database Initialization:**
+```bash
+# Apply migrations to PostgreSQL
+alembic upgrade head
+
+# Optional: Seed the database with mock trends for testing
+python3 populate_data.py
+```
+
+**C. Start API & Celery Worker:**
+```bash
+# Terminal 1: API Server (Access at http://localhost:8080)
+uvicorn app.main:app --reload --port 8080
+
+# Terminal 2: Celery Worker (Executes the actual AI agents)
+celery -A app.core.celery_app worker --loglevel=info
+```
+
+### 3. Frontend Apps
+**Admin Discovery CMS:**
+```bash
+cd frontend && npm install && npm run dev
+# Access: http://localhost:5173
+```
+
+**Public Blog Site:**
+```bash
+cd blog_site && npm install && npm run dev
+# Access: http://localhost:5174
+```
 
 ---
 
-### 2. Frontend Setup (React)
+## 🧪 Testing & Sanity Checks
 
-1.  **Navigate to frontend**:
-    ```bash
-    cd frontend
-    ```
-2.  **Install dependencies**:
-    ```bash
-    npm install
-    ```
-3.  **Run the development server**:
-    ```bash
-    npm run dev
-    ```
-4.  **Access the app**: [http://localhost:5173](http://localhost:5173)
-
----
-
-## ✅ Verification & Testing
-
-### Backend CRUD Test
-Run the automated verification script to ensure the API and database are working:
+### A. Core API Health
+Ensure the backend and DB are communicating:
 ```bash
 cd backend
 python3 verify_api.py
 ```
 
-### Blog Generation Pipeline
-You can trigger the full blog generation pipeline manually:
-1. Open [http://localhost:8000/docs](http://localhost:8000/docs)
-2. Locate the **generation** section.
-3. Use the `POST /api/v1/generation/trigger` endpoint with a `limit` of 2 or 5.
-4. Monitor logs in the terminal to see progress (Trends -> Scraping -> LLM Generation -> Image Generation).
+### B. Agent Pipeline Verification
+Test the full orchestrator logic (from Discovery to Draft) in a sandboxed mode:
+```bash
+cd backend
+python3 verify_agent_pipeline.py
+```
+
+### C. Manual Pipeline Trigger
+1. Go to **[http://localhost:8080/docs](http://localhost:8080/docs)**.
+2. Open `POST /api/v1/generation/trigger`.
+3. Payload: `{"user_topic": "Future of Generative AI", "include_images": false}`.
+4. Watch the **Celery Terminal** logs to verify agent handoffs and stage-level cost tracking.
+
+---
+
+## 🛡️ Core Features
+- **Hyper-Agentic Orchestration**: 6-layer pipeline from Discovery to Governance.
+- **Semantic Coverage Engine**: Real-time SEO ranking predictor using centroid vector analysis.
+- **Deterministic Pipeline**: Isolated stage execution with retries, timeouts, and cost tracking.
+- **Production Observability**: Structured JSON logging and Prometheus telemetry.
+
+## 🛠️ Tech Stack
+- **Backend**: FastAPI, SQLAlchemy, Alembic, Celery, Redis.
+- **Database**: PostgreSQL + pgvector.
+- **AI**: Gemini 1.5 Pro, Scikit-learn (Semantic Engine).
+- **Frontend**: React, Vite, Tailwind CSS.
+- **Monitoring**: Prometheus, Sentry.

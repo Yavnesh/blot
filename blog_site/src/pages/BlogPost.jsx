@@ -1,249 +1,224 @@
-import { useParams, Link } from 'react-router-dom'
-import { Helmet } from 'react-helmet-async'
-import { usePost } from '../hooks/usePosts'
-import Footer from '../components/Footer'
-
-const SITE_NAME = 'TEWS Intelligence'
-const SITE_URL = 'https://yourblog.com'
-
-function formatDate(iso) {
-    if (!iso) return ''
-    return new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
-}
-
-// Render raw markdown-ish content as HTML string safely
-// We just do basic line-break parsing; full markdown via a lib would be better for production
-function renderContent(content) {
-    if (!content) return ''
-    return content
-        .replace(/^#{1} (.+)$/gm, '<h1>$1</h1>')
-        .replace(/^#{2} (.+)$/gm, '<h2>$1</h2>')
-        .replace(/^#{3} (.+)$/gm, '<h3>$1</h3>')
-        .replace(/^#{4} (.+)$/gm, '<h4>$1</h4>')
-        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-        .replace(/\*(.+?)\*/g, '<em>$1</em>')
-        .replace(/`(.+?)`/g, '<code>$1</code>')
-        .replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>')
-        .replace(/^- (.+)$/gm, '<li>$1</li>')
-        .replace(/(<li>.*<\/li>\n?)+/g, m => `<ul>${m}</ul>`)
-        .replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
-        .replace(/\n\n/g, '</p><p>')
-        .replace(/^(?!<)(.+)$/gm, '$1')
-}
+import React, { useEffect, useState } from 'react';
+import { useParams, Link } from 'react-router-dom';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { usePost, usePosts } from '../hooks/usePosts';
+import PostCard from '../components/PostCard';
+import { ArrowLeft, Clock, Calendar, Share2, Bookmark, User, MessageSquare } from 'lucide-react';
 
 export default function BlogPost() {
-    const { slug } = useParams()
-    const { post, loading, error } = usePost(slug)
+    const { slug } = useParams();
+    const { post, loading, error } = usePost(slug);
+    const { posts: allPosts } = usePosts();
+    const [isBookmarked, setIsBookmarked] = useState(false);
+    const [copied, setCopied] = useState(false);
+    const [comments, setComments] = useState([]);
+    const [newComment, setNewComment] = useState("");
+
+    useEffect(() => {
+        window.scrollTo(0, 0);
+    }, [slug]);
 
     if (loading) return (
-        <>
-            <div style={{ padding: '6rem 2rem', maxWidth: '740px', margin: '0 auto' }}>
-                <div className="skeleton" style={{ height: '2rem', marginBottom: '1rem', borderRadius: '8px' }} />
-                <div className="skeleton" style={{ height: '3rem', marginBottom: '0.5rem', borderRadius: '8px' }} />
-                <div className="skeleton" style={{ height: '3rem', marginBottom: '2rem', borderRadius: '8px', width: '70%' }} />
-                {[1, 2, 3, 4, 5].map(i => (
-                    <div key={i} className="skeleton" style={{ height: '1rem', marginBottom: '0.6rem', borderRadius: '4px', width: `${70 + Math.random() * 30}%` }} />
-                ))}
-            </div>
-        </>
-    )
+        <div className="min-h-screen flex items-center justify-center bg-white dark:bg-neutral-900 transition-colors duration-500">
+            <div className="w-12 h-12 border-2 border-neutral-100 dark:border-neutral-800 border-t-brand rounded-full animate-spin"></div>
+        </div>
+    );
 
     if (error || !post) return (
-        <>
-            <Helmet><title>Post Not Found | TEWS</title></Helmet>
-            <div className="not-found">
-                <div className="not-found-code">404</div>
-                <h1 style={{ fontFamily: 'var(--font-serif)', marginBottom: '0.5rem' }}>Article Not Found</h1>
-                <p style={{ color: 'var(--ink-muted)', marginBottom: '2rem' }}>This article may have been moved or is not yet published.</p>
-                <Link to="/" className="back-link">← Back to all articles</Link>
-            </div>
-            <Footer />
-        </>
-    )
+        <div className="min-h-screen flex flex-col items-center justify-center bg-white dark:bg-neutral-900 p-6 text-center transition-colors duration-500">
+            <h1 className="display-medium dark:text-white mb-4">Post not found</h1>
+            <p className="body-large dark:text-neutral-400 mb-8">The digital archives do not contain this specific entry.</p>
+            <Link to="/" className="text-brand font-bold uppercase tracking-widest flex items-center gap-2 hover:translate-x-1 transition-transform">
+                <ArrowLeft size={16} /> Return to Home
+            </Link>
+        </div>
+    );
 
-    const canonicalUrl = `${SITE_URL}/blog/${post.slug}`
-    const scoreColor = post.seo_score >= 85 ? '#2563eb' : post.seo_score >= 70 ? '#f97316' : '#ef4444'
+    const handleShare = () => {
+        const url = window.location.href;
+        navigator.clipboard.writeText(url);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
 
-    // JSON-LD Article schema — the most important on-page ranking signal
-    const articleSchema = {
-        "@context": "https://schema.org",
-        "@type": post.schema_type || "Article",
-        "headline": post.title,
-        "description": post.meta_description || post.excerpt,
-        "url": canonicalUrl,
-        "datePublished": post.created_at,
-        "dateModified": post.created_at,
-        "wordCount": post.word_count,
-        "keywords": [post.focus_keyword, ...(post.hashtags || [])].filter(Boolean).join(', '),
-        "publisher": {
-            "@type": "Organization",
-            "name": SITE_NAME,
-            "url": SITE_URL
-        },
-        "mainEntityOfPage": { "@type": "WebPage", "@id": canonicalUrl }
+    const handleAddComment = (e) => {
+        e.preventDefault();
+        if (!newComment.trim()) return;
+        setComments([...comments, { id: Date.now(), text: newComment, author: 'Anonymous Visitor', date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) }]);
+        setNewComment("");
+    };
+
+    // Clean up content preamble (if any)
+    let cleanContent = post.content || "";
+    if (cleanContent.includes("Here is the ") || cleanContent.includes("Analysis:") || cleanContent.includes("**")) {
+        // basic heuristic to strip common AI intro sentences before the main content starts.
+        // Also just regex replace any single generic starting block like "Here is the article:"
+        cleanContent = cleanContent.replace(/^(Here is the .*?)\n+/i, '');
+        cleanContent = cleanContent.replace(/^(I have written .*?)\n+/i, '');
     }
 
-    if (post.research_sources?.length > 0) {
-        articleSchema.citation = post.research_sources.map(s => ({
-            "@type": "CreativeWork",
-            "name": s.title || s.url,
-            "url": s.url
-        }))
-    }
+    // Suggest related posts (exclude current)
+    const relatedPosts = allPosts
+        .filter(p => p.slug !== slug)
+        .slice(0, 3);
 
     return (
-        <>
-            <Helmet>
-                <title>{post.title} | {SITE_NAME}</title>
-                <meta name="description" content={post.meta_description || post.excerpt} />
-                {post.focus_keyword && <meta name="keywords" content={[post.focus_keyword, ...(post.hashtags || [])].join(', ')} />}
-                <link rel="canonical" href={canonicalUrl} />
+        <div className="bg-white dark:bg-neutral-900 min-h-screen pb-24 transition-colors duration-500">
+            {/* 8. Article Page Header */}
+            <header className="pt-32 pb-16 md:pt-40 md:pb-24 border-b border-neutral-50 dark:border-neutral-800 bg-neutral-50/20 dark:bg-neutral-800/20">
+                <div className="container-custom">
+                    <div className="max-w-[800px] mx-auto animate-reveal">
+                        <Link to="/articles" className="text-[10px] font-black uppercase tracking-[0.3em] text-brand mb-8 flex items-center gap-2 group w-fit">
+                            <ArrowLeft size={14} className="transition-transform group-hover:-translate-x-1" /> Back to Articles
+                        </Link>
 
-                {/* Open Graph */}
-                <meta property="og:type" content="article" />
-                <meta property="og:url" content={canonicalUrl} />
-                <meta property="og:title" content={post.title} />
-                <meta property="og:description" content={post.meta_description || post.excerpt} />
-                <meta property="og:site_name" content={SITE_NAME} />
-
-                {/* Twitter Card */}
-                <meta name="twitter:card" content="summary_large_image" />
-                <meta name="twitter:title" content={post.title} />
-                <meta name="twitter:description" content={post.meta_description || post.excerpt} />
-
-                {/* Article-specific meta */}
-                <meta property="article:published_time" content={post.created_at} />
-                {(post.hashtags || []).map((tag, i) => (
-                    <meta key={i} property="article:tag" content={tag} />
-                ))}
-
-                {/* JSON-LD */}
-                <script type="application/ld+json">{JSON.stringify(articleSchema)}</script>
-            </Helmet>
-
-            {/* ── Post Hero ──────────────────────────────────────────── */}
-            <div className="post-hero">
-                <div className="container">
-                    <div className="post-meta-row">
-                        <span className="post-category-badge">
-                            {post.schema_type || 'Article'}
-                        </span>
-                        <span className="post-date">{formatDate(post.created_at)}</span>
-                        {post.seo_score > 0 && (
-                            <span className="post-seo-badge">SEO {post.seo_score}%</span>
-                        )}
-                        {post.word_count > 0 && (
-                            <span className="post-seo-badge">{post.word_count.toLocaleString()} words</span>
-                        )}
-                    </div>
-
-                    <h1 className="post-title">{post.title}</h1>
-
-                    {post.meta_description && (
-                        <p className="post-subtitle">{post.meta_description}</p>
-                    )}
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-                        {post.focus_keyword && (
-                            <span className="post-keyword-pill">
-                                🔑 {post.focus_keyword}
+                        <div className="mb-6 flex items-center gap-3">
+                            <span className="bg-neutral-900 dark:bg-white dark:text-neutral-900 text-white px-4 py-1 rounded-full text-[9px] font-black uppercase tracking-widest">
+                                {post.category || 'Intelligence'}
                             </span>
-                        )}
-                        {post.hashtags?.length > 0 && (
-                            <div className="post-tags-row">
-                                {post.hashtags.map((tag, i) => (
-                                    <span key={i} className="post-tag">{tag}</span>
-                                ))}
+                            <div className="w-10 h-[1px] bg-neutral-200 dark:bg-neutral-800"></div>
+                            {post.seo_score > 0 && (
+                                <span className="bg-brand/10 text-brand px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest">Score: {post.seo_score}%</span>
+                            )}
+                        </div>
+
+                        <h1 className="text-4xl md:text-6xl font-serif font-black leading-[1.1] text-neutral-900 dark:text-white mb-8 tracking-tight">
+                            {post.title}
+                        </h1>
+
+                        <div className="flex flex-wrap items-center gap-8 border-t border-neutral-100 dark:border-neutral-800 pt-8">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center">
+                                    <User size={18} className="text-neutral-400 dark:text-neutral-500" />
+                                </div>
+                                <div>
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-neutral-900 dark:text-white">Research Agent v4</p>
+                                    <p className="text-[9px] font-bold text-neutral-400 dark:text-neutral-500 uppercase">Lead Investigator</p>
+                                </div>
                             </div>
-                        )}
+                            <div className="flex items-center gap-2 text-neutral-400 dark:text-neutral-500">
+                                <Calendar size={14} />
+                                <span className="text-[10px] font-black uppercase tracking-widest transition-colors">
+                                    {new Date(post.created_at || Date.now()).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-2 text-neutral-400 dark:text-neutral-500">
+                                <Clock size={14} />
+                                <span className="text-[10px] font-black uppercase tracking-widest transition-colors">{post.read_time || '5 min'}</span>
+                            </div>
+                        </div>
                     </div>
+                </div>
+            </header>
+
+            {/* Featured Image */}
+            <div className="container-custom -mt-12 md:-mt-20 mb-20 md:mb-24 animate-reveal delay-200">
+                <div className="max-w-[1100px] mx-auto rounded-[3rem] overflow-hidden shadow-2xl border border-neutral-100 dark:border-neutral-800 aspect-[16/9] md:aspect-[21/9]">
+                    {post.image_url ? (
+                        <img
+                            src={post.image_url.startsWith('http') ? post.image_url : `http://localhost:8080/${post.image_url}`}
+                            alt={post.title}
+                            className="w-full h-full object-cover"
+                        />
+                    ) : (
+                        <div className="w-full h-full bg-neutral-100 dark:bg-neutral-800/40" />
+                    )}
                 </div>
             </div>
 
-            {/* ── Post Body + Sidebar ────────────────────────────────── */}
-            <div className="post-layout">
-                {/* Main Article Content */}
-                <article>
-                    <Link to="/" className="back-link" style={{ display: 'inline-flex', marginBottom: '2rem', fontSize: '0.8rem' }}>
-                        ← All Articles
-                    </Link>
+            {/* Article Body */}
+            <section className="container-custom mb-32">
+                <div className="flex flex-col lg:flex-row gap-20">
+                    {/* Left Toolbar - Desktop Only */}
+                    <div className="hidden lg:block w-12 sticky top-48 h-fit space-y-8 animate-reveal delay-500">
+                        <button onClick={handleShare} className="w-12 h-12 rounded-full border border-neutral-100 dark:border-neutral-800 flex items-center justify-center hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors text-neutral-400 dark:text-neutral-500 hover:text-neutral-900 dark:hover:text-white relative group">
+                            <Share2 size={18} />
+                            {copied && <span className="absolute left-16 text-[10px] bg-neutral-900 text-white px-2 py-1 rounded">Copied!</span>}
+                        </button>
+                        <button onClick={() => setIsBookmarked(!isBookmarked)} className={`w-12 h-12 rounded-full border border-neutral-100 dark:border-neutral-800 flex items-center justify-center hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors ${isBookmarked ? 'text-brand bg-brand/5 border-brand/20' : 'text-neutral-400 dark:text-neutral-500 hover:text-neutral-900 dark:hover:text-white'}`}>
+                            <Bookmark size={18} className={isBookmarked ? "fill-brand" : ""} />
+                        </button>
+                        <div className="w-12 h-[1px] bg-neutral-100 dark:bg-neutral-800"></div>
+                        <div className="text-[10px] font-black uppercase tracking-widest text-neutral-300 dark:text-neutral-700 transform -rotate-90 origin-center translate-y-8 select-none">
+                            BLOT.IP
+                        </div>
+                    </div>
 
-                    <div
-                        className="post-content"
-                        dangerouslySetInnerHTML={{ __html: '<p>' + renderContent(post.content) + '</p>' }}
-                    />
+                    {/* Main Content */}
+                    <article className="flex-1 animate-reveal delay-300 max-w-full overflow-hidden">
+                        <div className="prose-editorial">
+                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                {cleanContent}
+                            </ReactMarkdown>
+                        </div>
 
-                    {/* Hashtag Footer */}
-                    {post.hashtags?.length > 0 && (
-                        <div style={{ marginTop: '3rem', paddingTop: '2rem', borderTop: '1px solid var(--border)' }}>
-                            <p style={{ fontSize: '0.72rem', fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-muted)', marginBottom: '0.75rem' }}>Topics</p>
-                            <div className="post-tags-row">
-                                {post.hashtags.map((tag, i) => (
-                                    <span key={i} className="post-tag">{tag}</span>
+                        {/* Article Tags/Footer */}
+                        {post.hashtags && post.hashtags.length > 0 && (
+                            <div className="prose-editorial border-t border-neutral-100 dark:border-neutral-800 mt-20 pt-12 flex flex-wrap gap-4">
+                                {post.hashtags.map(tag => (
+                                    <span key={tag} className="text-[10px] font-black uppercase tracking-widest px-4 py-2 bg-neutral-50 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400 rounded-lg hover:text-brand transition-colors cursor-pointer">
+                                        #{tag}
+                                    </span>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* Comments Section */}
+                        <div className="mt-20 pt-12 border-t border-neutral-100 dark:border-neutral-800">
+                            <h3 className="text-2xl font-serif font-bold text-neutral-900 dark:text-white mb-8 flex items-center gap-3">
+                                <MessageSquare size={24} className="text-neutral-400" /> Discussion ({comments.length})
+                            </h3>
+
+                            <form onSubmit={handleAddComment} className="mb-12">
+                                <textarea
+                                    className="w-full bg-neutral-50 dark:bg-neutral-800/50 border border-neutral-200 dark:border-neutral-800 rounded-2xl p-4 text-sm focus:outline-none focus:border-brand transition-colors resize-none text-neutral-900 dark:text-white placeholder-neutral-400"
+                                    rows="4"
+                                    placeholder="Add your perspective..."
+                                    value={newComment}
+                                    onChange={(e) => setNewComment(e.target.value)}
+                                ></textarea>
+                                <div className="flex justify-end mt-4">
+                                    <button type="submit" className="bg-neutral-900 dark:bg-white dark:text-neutral-900 text-white px-6 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-brand dark:hover:bg-brand dark:hover:text-white transition-colors">
+                                        Post Comment
+                                    </button>
+                                </div>
+                            </form>
+
+                            <div className="space-y-8">
+                                {comments.map(c => (
+                                    <div key={c.id} className="flex gap-4 p-6 bg-neutral-50/50 dark:bg-neutral-800/30 rounded-2xl">
+                                        <div className="w-10 h-10 rounded-full bg-neutral-200 dark:bg-neutral-700 flex items-center justify-center flex-shrink-0">
+                                            <User size={16} className="text-neutral-500" />
+                                        </div>
+                                        <div>
+                                            <div className="flex items-center gap-3 mb-2">
+                                                <span className="text-[11px] font-black uppercase tracking-widest text-neutral-900 dark:text-white">{c.author}</span>
+                                                <span className="text-[10px] font-bold text-neutral-400">{c.date}</span>
+                                            </div>
+                                            <p className="text-sm text-neutral-600 dark:text-neutral-300 leading-relaxed">{c.text}</p>
+                                        </div>
+                                    </div>
                                 ))}
                             </div>
                         </div>
-                    )}
-                </article>
+                    </article>
+                </div>
+            </section>
 
-                {/* Sidebar */}
-                <aside className="post-sidebar">
-                    {/* SEO Score Widget */}
-                    {post.seo_score > 0 && (
-                        <div className="sidebar-widget">
-                            <div className="sidebar-widget-title">SEO Authority Score</div>
-                            <div className="seo-score-ring">
-                                <div className="seo-score-num" style={{ color: scoreColor }}>{post.seo_score}%</div>
-                                <div className="seo-score-label">On-Page Score</div>
-                            </div>
-                            {post.coverage_score > 0 && (
-                                <div className="coverage-bar">
-                                    <div className="coverage-label">
-                                        <span>SERP Coverage</span>
-                                        <span style={{ color: 'var(--accent)' }}>{post.coverage_score}%</span>
-                                    </div>
-                                    <div className="coverage-bar-track">
-                                        <div className="coverage-bar-fill" style={{ width: `${post.coverage_score}%` }} />
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {/* Internal Links */}
-                    {post.internal_link_suggestions?.length > 0 && (
-                        <div className="sidebar-widget">
-                            <div className="sidebar-widget-title">Related Topics</div>
-                            {post.internal_link_suggestions.map((link, i) => (
-                                <Link to="/" key={i} className="internal-link">{link}</Link>
+            {/* Related Posts */}
+            {relatedPosts.length > 0 && (
+                <section className="section-padding bg-neutral-50/50 dark:bg-neutral-800/10 border-t border-neutral-100 dark:border-neutral-800">
+                    <div className="container-custom">
+                        <h2 className="heading-medium tracking-tight text-neutral-900 dark:text-white mb-12">Related Perspectives</h2>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12 lg:gap-16">
+                            {relatedPosts.map(p => (
+                                <PostCard key={p.id} post={p} />
                             ))}
                         </div>
-                    )}
-
-                    {/* Research Sources */}
-                    {post.research_sources?.length > 0 && (
-                        <div className="sidebar-widget">
-                            <div className="sidebar-widget-title">Research Sources</div>
-                            {post.research_sources.slice(0, 8).map((source, i) => (
-                                <a
-                                    key={i}
-                                    href={source.url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="source-link"
-                                >
-                                    <span className="source-num">{i + 1}</span>
-                                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                        {source.title || source.url}
-                                    </span>
-                                </a>
-                            ))}
-                        </div>
-                    )}
-                </aside>
-            </div>
-
-            <Footer />
-        </>
-    )
+                    </div>
+                </section>
+            )}
+        </div>
+    );
 }

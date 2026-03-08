@@ -27,6 +27,7 @@ class PostBase(BaseModel):
     word_count: Optional[int] = 0
     seo_data: Optional[Any] = {}
     research_sources: Optional[Any] = []
+    agent_telemetry: Optional[Any] = []
     pub_platform: Optional[str] = 'none'
     pub_meta: Optional[Any] = {}
 

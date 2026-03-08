@@ -1,154 +1,137 @@
-import { Helmet } from 'react-helmet-async'
-import { Link } from 'react-router-dom'
-import { usePosts } from '../hooks/usePosts'
-import PostCard from '../components/PostCard'
-import Footer from '../components/Footer'
 
-const SITE_NAME = 'TEWS Intelligence'
-const SITE_URL = 'https://yourblog.com'
-
-function SkeletonCard() {
-    return <div className="skeleton skeleton-card" />
-}
+import React from 'react';
+import { usePosts } from '../hooks/usePosts';
+import PostCard from '../components/PostCard';
+import { Link } from 'react-router-dom';
+import { ArrowRight, Mail } from 'lucide-react';
 
 export default function Home() {
-    const { posts, loading, error } = usePosts()
+    const { posts, loading } = usePosts();
 
-    const featured = posts[0] || null
-    const rest = posts.slice(1)
+    // Split posts into Featured and Recent
+    const featuredPosts = posts.slice(0, 3);
+    const recentPosts = posts.slice(3, 9);
+    const heroPost = posts[0];
+
+    if (loading) return (
+        <div className="min-h-screen flex items-center justify-center bg-white dark:bg-neutral-900 transition-colors duration-500">
+            <div className="w-12 h-12 border-2 border-neutral-100 dark:border-neutral-800 border-t-brand rounded-full animate-spin"></div>
+        </div>
+    );
 
     return (
-        <>
-            <Helmet>
-                <title>Tech Intelligence Blog — AI, Innovation & Industry Analysis | TEWS</title>
-                <meta name="description" content="In-depth technology analysis, AI research, and industry intelligence — researched and written by an autonomous editorial engine." />
-                <link rel="canonical" href={SITE_URL} />
-                {/* Open Graph */}
-                <meta property="og:type" content="website" />
-                <meta property="og:url" content={SITE_URL} />
-                <meta property="og:title" content="TEWS — Tech Intelligence Blog" />
-                <meta property="og:description" content="AI-powered tech analysis and industry intelligence." />
-                {/* Twitter Card */}
-                <meta name="twitter:card" content="summary_large_image" />
-                <meta name="twitter:title" content="TEWS — Tech Intelligence Blog" />
-                {/* JSON-LD: WebSite schema */}
-                <script type="application/ld+json">{JSON.stringify({
-                    "@context": "https://schema.org",
-                    "@type": "WebSite",
-                    "name": SITE_NAME,
-                    "url": SITE_URL,
-                    "description": "AI-powered technology intelligence blog",
-                    "potentialAction": {
-                        "@type": "SearchAction",
-                        "target": `${SITE_URL}/?s={search_term_string}`,
-                        "query-input": "required name=search_term_string"
-                    }
-                })}</script>
-            </Helmet>
+        <div className="bg-white dark:bg-neutral-900 transition-colors duration-500">
+            {/* 3. Hero Section */}
+            <section className="pt-40 pb-24 md:pt-48 md:pb-32 bg-neutral-50/50 dark:bg-neutral-800/20 border-b border-neutral-100 dark:border-neutral-800 overflow-hidden relative">
+                {/* Background Subtle Pattern */}
+                <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05] pointer-events-none bg-[radial-gradient(#000_1px,transparent_1px)] dark:bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:24px_24px]"></div>
 
-            <main>
-                {/* ── Hero ───────────────────────────────────────────────── */}
-                <section className="hero">
-                    <div className="container">
-                        <div className="hero-eyebrow">AI Editorial Engine · Live</div>
-                        <h1 className="hero-title">
-                            Technology intelligence,<br />
-                            <em>researched and ranked.</em>
-                        </h1>
-                        <p className="hero-desc">
-                            Every article is researched from live sources, SEO-blueprinted against real SERP data,
-                            and drafted by a multi-agent AI pipeline — then published here.
-                        </p>
-                        {!loading && (
-                            <div className="hero-stats">
-                                <div className="hero-stat">
-                                    <div className="hero-stat-num">{posts.length}</div>
-                                    <div className="hero-stat-label">Articles Published</div>
-                                </div>
-                                <div className="hero-stat">
-                                    <div className="hero-stat-num">
-                                        {posts.length > 0
-                                            ? Math.round(posts.reduce((s, p) => s + (p.seo_score || 0), 0) / posts.length)
-                                            : 0}%
-                                    </div>
-                                    <div className="hero-stat-label">Avg SEO Score</div>
-                                </div>
-                                <div className="hero-stat">
-                                    <div className="hero-stat-num">
-                                        {posts.reduce((s, p) => s + (p.word_count || 0), 0).toLocaleString()}
-                                    </div>
-                                    <div className="hero-stat-label">Words of Intelligence</div>
-                                </div>
+                <div className="container-custom relative">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-20 items-center">
+                        <div className="animate-reveal">
+                            <span className="text-[10px] font-black uppercase tracking-[0.4em] text-brand mb-6 block">The Future of Content v4.0</span>
+                            <h1 className="display-large text-neutral-900 dark:text-white mb-8 max-w-xl">
+                                From a simple Blot to <span className="text-brand">infinite ideas</span>.
+                            </h1>
+                            <p className="body-large mb-12 max-w-lg italic text-neutral-500 dark:text-neutral-400">
+                                Welcome to <strong>Blot</strong> — where the <strong>Blog</strong> meets the <strong>Bot</strong>. A modern AI-powered editorial desk delivering high-quality articles on technology, business, and the culture of tomorrow.
+                            </p>
+                            <div className="flex flex-wrap gap-6">
+                                <Link to="/articles" className="bg-neutral-900 dark:bg-white dark:text-neutral-900 text-white px-10 py-5 rounded-full text-xs font-bold uppercase tracking-widest hover:bg-neutral-800 dark:hover:bg-neutral-100 transition-all hover:translate-x-1 flex items-center gap-3 shadow-xl shadow-neutral-200 dark:shadow-none">
+                                    Read Articles <ArrowRight size={14} />
+                                </Link>
+                                <button className="border-2 border-neutral-100 dark:border-neutral-800 px-10 py-5 rounded-full text-xs font-bold uppercase tracking-widest hover:border-brand transition-all hover:bg-brand/5 dark:text-white">
+                                    Subscribe
+                                </button>
+                            </div>
+                        </div>
+
+                        {heroPost && (
+                            <div className="animate-reveal delay-200">
+                                <PostCard post={heroPost} featured={true} />
                             </div>
                         )}
                     </div>
-                </section>
+                </div>
+            </section>
 
-                {/* ── Featured ──────────────────────────────────────────── */}
-                <section className="section">
-                    <div className="container">
-                        {loading ? (
-                            <div className="loading-grid">
-                                {[1, 2, 3].map(i => <SkeletonCard key={i} />)}
-                            </div>
-                        ) : error ? (
-                            <div className="empty-state">
-                                <div className="empty-state-icon">⚠️</div>
-                                <h2 className="empty-state-title">Could not load articles</h2>
-                                <p className="empty-state-desc">Make sure the backend is running at localhost:8080</p>
-                            </div>
-                        ) : posts.length === 0 ? (
-                            <div className="empty-state">
-                                <div className="empty-state-icon">✍️</div>
-                                <h2 className="empty-state-title">No articles published yet</h2>
-                                <p className="empty-state-desc">
-                                    Go to the <a href="http://localhost:5173" style={{ color: 'var(--accent)' }}>CMS Admin</a> and publish your first post.
-                                </p>
-                            </div>
-                        ) : (
-                            <>
-                                {/* Featured Post */}
-                                {featured && (
-                                    <article className="featured-post" aria-label="Featured article">
-                                        <div className="featured-post-visual">
-                                            <div className="featured-post-visual-grid" />
-                                            <svg width="80" height="80" viewBox="0 0 80 80" fill="none">
-                                                <rect width="80" height="80" rx="20" fill="rgba(255,255,255,0.1)" />
-                                                <path d="M20 30h40M20 40h30M20 50h35" stroke="rgba(255,255,255,0.6)" strokeWidth="3" strokeLinecap="round" />
-                                            </svg>
-                                        </div>
-                                        <div className="featured-post-body">
-                                            <div className="featured-eyebrow">⚡ Featured Article</div>
-                                            <h2 className="featured-title">{featured.title}</h2>
-                                            <p className="featured-excerpt">{featured.excerpt}</p>
-                                            <Link to={`/blog/${featured.slug}`} className="featured-cta">
-                                                Read Full Analysis →
-                                            </Link>
-                                        </div>
-                                    </article>
-                                )}
-
-                                {/* Rest of posts */}
-                                {rest.length > 0 && (
-                                    <>
-                                        <div className="section-header">
-                                            <div className="section-eyebrow">Latest Intelligence</div>
-                                            <h2 className="section-title">All Articles</h2>
-                                        </div>
-                                        <div className="posts-grid">
-                                            {rest.map(post => (
-                                                <PostCard key={post.id} post={post} />
-                                            ))}
-                                        </div>
-                                    </>
-                                )}
-                            </>
-                        )}
+            {/* 4. Featured Articles Section */}
+            {featuredPosts.length > 0 && (
+                <section className="section-padding border-b border-neutral-100 dark:border-neutral-800">
+                    <div className="container-custom">
+                        <div className="flex items-center justify-between mb-12 md:mb-16">
+                            <h2 className="heading-large tracking-tight text-neutral-900 dark:text-white">Featured</h2>
+                            <Link to="/articles" className="text-sm font-bold uppercase tracking-widest text-neutral-400 hover:text-brand transition-colors flex items-center gap-2">
+                                View Selection <ArrowRight size={14} />
+                            </Link>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12 lg:gap-16">
+                            {featuredPosts.map(post => (
+                                <PostCard key={post.id} post={post} />
+                            ))}
+                        </div>
                     </div>
                 </section>
-            </main>
+            )}
 
-            <Footer totalPosts={posts.length} />
-        </>
-    )
+            {/* 5. Recent Articles Grid */}
+            {recentPosts.length > 0 && (
+                <section className="section-padding bg-neutral-50/30 dark:bg-neutral-800/10">
+                    <div className="container-custom">
+                        <div className="flex items-center justify-between mb-12 md:mb-16">
+                            <h2 className="heading-large tracking-tight text-neutral-900 dark:text-white">Recent Articles</h2>
+                            <div className="w-1/3 h-[1px] bg-neutral-100 dark:bg-neutral-800"></div>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12 lg:gap-16">
+                            {recentPosts.map(post => (
+                                <PostCard key={post.id} post={post} />
+                            ))}
+                        </div>
+
+                        <div className="mt-20 text-center">
+                            <Link to="/articles" className="inline-flex items-center gap-3 text-sm font-bold uppercase tracking-[0.2em] border-b-2 border-neutral-100 dark:border-neutral-800 pb-2 hover:border-brand transition-all dark:text-white">
+                                Load More Stories <ArrowRight size={16} />
+                            </Link>
+                        </div>
+                    </div>
+                </section>
+            )}
+
+            {/* 7. Newsletter Section */}
+            <section className="section-padding">
+                <div className="container-custom">
+                    <div className="bg-neutral-900 dark:bg-black rounded-[3rem] p-12 md:p-24 text-center relative overflow-hidden shadow-2xl transition-colors duration-500">
+                        {/* Abstract Background Element */}
+                        <div className="absolute -top-24 -right-24 w-96 h-96 bg-brand opacity-10 rounded-full blur-[100px]"></div>
+                        <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-brand opacity-10 rounded-full blur-[100px]"></div>
+
+                        <div className="max-w-2xl mx-auto relative z-10 animate-reveal">
+                            <h2 className="text-4xl md:text-5xl font-serif font-bold text-white mb-6 leading-tight">
+                                Stay updated with our <span className="text-brand italic">latest stories</span>
+                            </h2>
+                            <p className="text-neutral-400 text-lg md:text-xl mb-12 italic">
+                                Subscribe to receive new articles, deep-dives into human creative logic, and technology news directly in your inbox.
+                            </p>
+                            <form className="flex flex-col sm:flex-row gap-4 max-w-xl mx-auto">
+                                <div className="flex-1 relative">
+                                    <input
+                                        type="email"
+                                        placeholder="Enter your email address"
+                                        className="w-full bg-white/5 border border-white/10 rounded-full py-5 px-8 text-white placeholder:text-neutral-600 outline-none focus:border-brand transition-all"
+                                    />
+                                    <Mail className="absolute right-6 top-1/2 -translate-y-1/2 text-neutral-600 w-5 h-5" />
+                                </div>
+                                <button className="bg-brand text-white px-10 py-5 rounded-full text-xs font-black uppercase tracking-widest hover:bg-brand-dark transition-all transform hover:-translate-y-1 active:scale-95 shadow-xl shadow-brand/20">
+                                    Subscribe Now
+                                </button>
+                            </form>
+                            <p className="mt-8 text-neutral-500 text-[10px] uppercase font-bold tracking-widest opacity-50">
+                                Join 5,000+ readers. No spam, just intelligence.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    );
 }

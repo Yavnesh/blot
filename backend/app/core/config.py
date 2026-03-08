@@ -3,11 +3,22 @@ from pydantic_settings import BaseSettings
 from typing import List, Union
 
 class Settings(BaseSettings):
-    PROJECT_NAME: str = "Tews CRM"
+    PROJECT_NAME: str = "TEWS Intelligence Engine"
     API_V1_STR: str = "/api/v1"
     
     # DATABASE
-    SQLALCHEMY_DATABASE_URI: str = "sqlite:///./crm.db"
+    # PostgreSQL connection string: postgresql://user:password@postgresserver/db
+    SQLALCHEMY_DATABASE_URI: str = "postgresql://postgres:postgres@localhost:5432/tews"
+
+    # REDIS / CELERY
+    REDIS_URL: str = "redis://localhost:6379/0"
+    CELERY_BROKER_URL: str = REDIS_URL
+    CELERY_RESULT_BACKEND: str = REDIS_URL
+
+    # OBSERVABILITY
+    SENTRY_DSN: str = ""
+    PROMETHEUS_METRICS_ENABLED: bool = True
+    OTEL_EXPORTER_OTLP_ENDPOINT: str = "http://localhost:4317"
 
     # CORS
     BACKEND_CORS_ORIGINS: List[str] = [
@@ -24,13 +35,13 @@ class Settings(BaseSettings):
 
     # External APIs
     GEMINI_API_KEY_1: str = "AIzaSyA-C-ONNj0jm90WiZPBEibDn0L3fvrys40"
+    # ... (rest of keys)
     GEMINI_API_KEY_2: str = "AIzaSyCaYJ7_D3_6_xB3jfS_UTwMPxoP2ssIbkk"
     GEMINI_API_KEY_3: str = "AIzaSyAdlRe6MaqzN_mQsNfHdqcV_QOmfQwwDEY"
     GEMINI_API_KEY_4: str = "AIzaSyDdIhcWY0GKZqH0FuUf1--zgCXlLqXYOxo"
-    GEMINI_API_KEY_5: str = ""  # Add more keys here to expand the pool
-    GEMINI_API_KEY_6: str = ""  # Add more keys here to expand the pool
+    GEMINI_API_KEY_5: str = ""
+    GEMINI_API_KEY_6: str = ""
 
-    # External APIs
     STABLE_HORDE_API_KEY: str = "7LGsqLjIsFMXtsnwbgobTA"
     TWITTER_CONSUMER_KEY: str = "n6WhBu3WFF3OU0qwEDwD1Zrza"
     TWITTER_CONSUMER_SECRET: str = "kjvqKWucaPNfFAFhT8y1HdbDFr00uiIHqU1uQ6gPCsCh6MznJ8"

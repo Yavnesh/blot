@@ -7,3 +7,4 @@ from app.models.trending import Trending
 from app.models.post import Post
 from app.models.fine_tune_data import FineTuneData
 from app.models.task_progress import TaskProgress
+from app.models.modular_models import *
