@@ -1,16 +1,19 @@
-
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { usePost, usePosts } from '../hooks/usePosts';
 import PostCard from '../components/PostCard';
-import { ArrowLeft, Clock, Calendar, Share2, Bookmark, User } from 'lucide-react';
+import { ArrowLeft, Clock, Calendar, Share2, Bookmark, User, MessageSquare } from 'lucide-react';
 
 export default function BlogPost() {
     const { slug } = useParams();
     const { post, loading, error } = usePost(slug);
     const { posts: allPosts } = usePosts();
+    const [isBookmarked, setIsBookmarked] = useState(false);
+    const [copied, setCopied] = useState(false);
+    const [comments, setComments] = useState([]);
+    const [newComment, setNewComment] = useState("");
 
     useEffect(() => {
         window.scrollTo(0, 0);
@@ -32,6 +35,29 @@ export default function BlogPost() {
         </div>
     );
 
+    const handleShare = () => {
+        const url = window.location.href;
+        navigator.clipboard.writeText(url);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
+
+    const handleAddComment = (e) => {
+        e.preventDefault();
+        if (!newComment.trim()) return;
+        setComments([...comments, { id: Date.now(), text: newComment, author: 'Anonymous Visitor', date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) }]);
+        setNewComment("");
+    };
+
+    // Clean up content preamble (if any)
+    let cleanContent = post.content || "";
+    if (cleanContent.includes("Here is the ") || cleanContent.includes("Analysis:") || cleanContent.includes("**")) {
+        // basic heuristic to strip common AI intro sentences before the main content starts.
+        // Also just regex replace any single generic starting block like "Here is the article:"
+        cleanContent = cleanContent.replace(/^(Here is the .*?)\n+/i, '');
+        cleanContent = cleanContent.replace(/^(I have written .*?)\n+/i, '');
+    }
+
     // Suggest related posts (exclude current)
     const relatedPosts = allPosts
         .filter(p => p.slug !== slug)
@@ -52,7 +78,9 @@ export default function BlogPost() {
                                 {post.category || 'Intelligence'}
                             </span>
                             <div className="w-10 h-[1px] bg-neutral-200 dark:bg-neutral-800"></div>
-                            <span className="text-neutral-400 dark:text-neutral-500 text-[9px] font-black uppercase tracking-widest italic">Featured Insight</span>
+                            {post.seo_score > 0 && (
+                                <span className="bg-brand/10 text-brand px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest">Score: {post.seo_score}%</span>
+                            )}
                         </div>
 
                         <h1 className="text-4xl md:text-6xl font-serif font-black leading-[1.1] text-neutral-900 dark:text-white mb-8 tracking-tight">
@@ -77,7 +105,7 @@ export default function BlogPost() {
                             </div>
                             <div className="flex items-center gap-2 text-neutral-400 dark:text-neutral-500">
                                 <Clock size={14} />
-                                <span className="text-[10px] font-black uppercase tracking-widest transition-colors">{post.read_time || '7 min'} read</span>
+                                <span className="text-[10px] font-black uppercase tracking-widest transition-colors">{post.read_time || '5 min'}</span>
                             </div>
                         </div>
                     </div>
@@ -89,7 +117,7 @@ export default function BlogPost() {
                 <div className="max-w-[1100px] mx-auto rounded-[3rem] overflow-hidden shadow-2xl border border-neutral-100 dark:border-neutral-800 aspect-[16/9] md:aspect-[21/9]">
                     {post.image_url ? (
                         <img
-                            src={`http://localhost:8080/${post.image_url}`}
+                            src={post.image_url.startsWith('http') ? post.image_url : `http://localhost:8080/${post.image_url}`}
                             alt={post.title}
                             className="w-full h-full object-cover"
                         />
@@ -104,11 +132,12 @@ export default function BlogPost() {
                 <div className="flex flex-col lg:flex-row gap-20">
                     {/* Left Toolbar - Desktop Only */}
                     <div className="hidden lg:block w-12 sticky top-48 h-fit space-y-8 animate-reveal delay-500">
-                        <button className="w-12 h-12 rounded-full border border-neutral-100 dark:border-neutral-800 flex items-center justify-center hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors text-neutral-400 dark:text-neutral-500 hover:text-neutral-900 dark:hover:text-white">
+                        <button onClick={handleShare} className="w-12 h-12 rounded-full border border-neutral-100 dark:border-neutral-800 flex items-center justify-center hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors text-neutral-400 dark:text-neutral-500 hover:text-neutral-900 dark:hover:text-white relative group">
                             <Share2 size={18} />
+                            {copied && <span className="absolute left-16 text-[10px] bg-neutral-900 text-white px-2 py-1 rounded">Copied!</span>}
                         </button>
-                        <button className="w-12 h-12 rounded-full border border-neutral-100 dark:border-neutral-800 flex items-center justify-center hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors text-neutral-400 dark:text-neutral-500 hover:text-neutral-900 dark:hover:text-white">
-                            <Bookmark size={18} />
+                        <button onClick={() => setIsBookmarked(!isBookmarked)} className={`w-12 h-12 rounded-full border border-neutral-100 dark:border-neutral-800 flex items-center justify-center hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors ${isBookmarked ? 'text-brand bg-brand/5 border-brand/20' : 'text-neutral-400 dark:text-neutral-500 hover:text-neutral-900 dark:hover:text-white'}`}>
+                            <Bookmark size={18} className={isBookmarked ? "fill-brand" : ""} />
                         </button>
                         <div className="w-12 h-[1px] bg-neutral-100 dark:bg-neutral-800"></div>
                         <div className="text-[10px] font-black uppercase tracking-widest text-neutral-300 dark:text-neutral-700 transform -rotate-90 origin-center translate-y-8 select-none">
@@ -117,20 +146,61 @@ export default function BlogPost() {
                     </div>
 
                     {/* Main Content */}
-                    <article className="flex-1 animate-reveal delay-300">
+                    <article className="flex-1 animate-reveal delay-300 max-w-full overflow-hidden">
                         <div className="prose-editorial">
                             <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                {post.content}
+                                {cleanContent}
                             </ReactMarkdown>
                         </div>
 
                         {/* Article Tags/Footer */}
-                        <div className="prose-editorial border-t border-neutral-100 dark:border-neutral-800 mt-20 pt-12 flex flex-wrap gap-4">
-                            {['Artificial Intelligence', 'Future Tech', 'Deep Research'].map(tag => (
-                                <span key={tag} className="text-[10px] font-black uppercase tracking-widest px-4 py-2 bg-neutral-50 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400 rounded-lg hover:text-brand transition-colors cursor-pointer">
-                                    #{tag}
-                                </span>
-                            ))}
+                        {post.hashtags && post.hashtags.length > 0 && (
+                            <div className="prose-editorial border-t border-neutral-100 dark:border-neutral-800 mt-20 pt-12 flex flex-wrap gap-4">
+                                {post.hashtags.map(tag => (
+                                    <span key={tag} className="text-[10px] font-black uppercase tracking-widest px-4 py-2 bg-neutral-50 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400 rounded-lg hover:text-brand transition-colors cursor-pointer">
+                                        #{tag}
+                                    </span>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* Comments Section */}
+                        <div className="mt-20 pt-12 border-t border-neutral-100 dark:border-neutral-800">
+                            <h3 className="text-2xl font-serif font-bold text-neutral-900 dark:text-white mb-8 flex items-center gap-3">
+                                <MessageSquare size={24} className="text-neutral-400" /> Discussion ({comments.length})
+                            </h3>
+
+                            <form onSubmit={handleAddComment} className="mb-12">
+                                <textarea
+                                    className="w-full bg-neutral-50 dark:bg-neutral-800/50 border border-neutral-200 dark:border-neutral-800 rounded-2xl p-4 text-sm focus:outline-none focus:border-brand transition-colors resize-none text-neutral-900 dark:text-white placeholder-neutral-400"
+                                    rows="4"
+                                    placeholder="Add your perspective..."
+                                    value={newComment}
+                                    onChange={(e) => setNewComment(e.target.value)}
+                                ></textarea>
+                                <div className="flex justify-end mt-4">
+                                    <button type="submit" className="bg-neutral-900 dark:bg-white dark:text-neutral-900 text-white px-6 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-brand dark:hover:bg-brand dark:hover:text-white transition-colors">
+                                        Post Comment
+                                    </button>
+                                </div>
+                            </form>
+
+                            <div className="space-y-8">
+                                {comments.map(c => (
+                                    <div key={c.id} className="flex gap-4 p-6 bg-neutral-50/50 dark:bg-neutral-800/30 rounded-2xl">
+                                        <div className="w-10 h-10 rounded-full bg-neutral-200 dark:bg-neutral-700 flex items-center justify-center flex-shrink-0">
+                                            <User size={16} className="text-neutral-500" />
+                                        </div>
+                                        <div>
+                                            <div className="flex items-center gap-3 mb-2">
+                                                <span className="text-[11px] font-black uppercase tracking-widest text-neutral-900 dark:text-white">{c.author}</span>
+                                                <span className="text-[10px] font-bold text-neutral-400">{c.date}</span>
+                                            </div>
+                                            <p className="text-sm text-neutral-600 dark:text-neutral-300 leading-relaxed">{c.text}</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     </article>
                 </div>

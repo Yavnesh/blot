@@ -9,6 +9,7 @@ const ArticlePreview = ({ post, onBack, onUpdate }) => {
     const [rerunningAgent, setRerunningAgent] = useState(null);
     const [rerunResult, setRerunResult] = useState(null);
     const [showDiff, setShowDiff] = useState(false);
+    const [agentMeta, setAgentMeta] = useState({});
 
     // Agent mapping for display
     const agentDisplayNames = {
@@ -45,8 +46,13 @@ const ArticlePreview = ({ post, onBack, onUpdate }) => {
 
     const handleRerun = async (agentKey) => {
         setRerunningAgent(agentKey);
+        const meta = agentMeta[agentKey] || {};
         try {
-            const res = await fetch(`${API_BASE}/posts/${post.id}/rerun-agent?agent_key=${agentKey}`, { method: 'POST' });
+            const res = await fetch(`${API_BASE}/posts/${post.id}/rerun-agent?agent_key=${agentKey}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(meta)
+            });
             if (res.ok) {
                 const data = await res.json();
                 setRerunResult({ agentKey, ...data });
@@ -165,7 +171,7 @@ const ArticlePreview = ({ post, onBack, onUpdate }) => {
                         {post.image_crm?.[0] && (
                             <div className="mb-10 rounded-[3rem] overflow-hidden shadow-2xl border border-slate-200">
                                 <img
-                                    src={`http://localhost:8080/${post.image_crm[0]}`}
+                                    src={post.image_crm[0].startsWith('http') ? post.image_crm[0] : `http://localhost:8080/${post.image_crm[0]}`}
                                     alt={displayTitle}
                                     className="w-full h-auto object-cover max-h-[500px]"
                                 />
@@ -186,6 +192,18 @@ const ArticlePreview = ({ post, onBack, onUpdate }) => {
                                     SEO {post.seo_data.score}%
                                 </span>
                             )}
+                            {post.category && post.category[0] && (
+                                <span className="bg-amber-50 text-amber-700 border border-amber-200 px-3 py-1 rounded-full text-[9px] font-black tracking-widest uppercase">
+                                    {Array.isArray(post.category) ? post.category[0] : post.category}
+                                </span>
+                            )}
+                        </div>
+                        <div className="flex flex-wrap gap-2 mb-8">
+                            {post.tags && post.tags.map(tag => (
+                                <span key={tag} className="text-[10px] font-bold text-slate-400 capitalize bg-slate-50 px-3 py-1 rounded-md border border-slate-100">
+                                    #{tag}
+                                </span>
+                            ))}
                         </div>
                         <p className="text-xl text-slate-500 leading-relaxed max-w-2xl font-medium">
                             {displayMeta}
@@ -288,6 +306,47 @@ const ArticlePreview = ({ post, onBack, onUpdate }) => {
                                                     )}
                                                     Rerun Layer
                                                 </button>
+                                            </div>
+
+                                            {/* Rerun Metadata Block */}
+                                            <div className="mt-4 pt-4 border-t border-slate-50 space-y-2 opacity-0 group-hover:opacity-100 transition-opacity hidden group-hover:block">
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Audience (e.g. Gen Z, Tech Experts)"
+                                                        className="w-full text-[9px] px-2 py-1 border border-slate-200 rounded outline-none"
+                                                        value={agentMeta[log.agent_name]?.target_audience || ''}
+                                                        onChange={(e) => setAgentMeta({ ...agentMeta, [log.agent_name]: { ...agentMeta[log.agent_name], target_audience: e.target.value } })}
+                                                    />
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Tone (e.g. Casual, Professional)"
+                                                        className="w-full text-[9px] px-2 py-1 border border-slate-200 rounded outline-none"
+                                                        value={agentMeta[log.agent_name]?.tone || ''}
+                                                        onChange={(e) => setAgentMeta({ ...agentMeta, [log.agent_name]: { ...agentMeta[log.agent_name], tone: e.target.value } })}
+                                                    />
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Keywords (comma separated)"
+                                                        className="w-full text-[9px] px-2 py-1 border border-slate-200 rounded outline-none"
+                                                        value={agentMeta[log.agent_name]?.primary_keyword || ''}
+                                                        onChange={(e) => setAgentMeta({ ...agentMeta, [log.agent_name]: { ...agentMeta[log.agent_name], primary_keyword: e.target.value } })}
+                                                    />
+                                                    <input
+                                                        type="number"
+                                                        placeholder="Word Count Target"
+                                                        className="w-full text-[9px] px-2 py-1 border border-slate-200 rounded outline-none"
+                                                        value={agentMeta[log.agent_name]?.word_count_target || ''}
+                                                        onChange={(e) => setAgentMeta({ ...agentMeta, [log.agent_name]: { ...agentMeta[log.agent_name], word_count_target: e.target.value } })}
+                                                    />
+                                                </div>
+                                                <textarea
+                                                    placeholder="Additional Context or specific instructions"
+                                                    className="w-full text-[9px] px-2 py-1 border border-slate-200 rounded outline-none resize-none"
+                                                    rows="2"
+                                                    value={agentMeta[log.agent_name]?.additional_context || ''}
+                                                    onChange={(e) => setAgentMeta({ ...agentMeta, [log.agent_name]: { ...agentMeta[log.agent_name], additional_context: e.target.value } })}
+                                                ></textarea>
                                             </div>
                                         </div>
                                     ))}

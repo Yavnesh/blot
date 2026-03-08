@@ -14,7 +14,7 @@ export default function PostCard({ post, featured = false }) {
             <div className={`image-zoom-container rounded-3xl mb-6 relative shadow-sm transition-all duration-500 group-hover:shadow-2xl dark:group-hover:shadow-none group-hover:-translate-y-2 border border-transparent dark:group-hover:border-neutral-800 ${featured ? 'aspect-[16/9]' : 'aspect-square'}`}>
                 {post.image_url ? (
                     <img
-                        src={`http://localhost:8080/${post.image_url}`}
+                        src={post.image_url.startsWith('http') ? post.image_url : `http://localhost:8080/${post.image_url}`}
                         alt={post.title}
                         className="w-full h-full object-cover rounded-3xl"
                     />

@@ -1,3 +1,4 @@
+import asyncio
 from typing import Dict, Any, List
 from loguru import logger
 from app.agents.core.base_agent import BaseAgent, AgentOutput
@@ -24,44 +25,27 @@ class ImageAgent(BaseAgent):
 
         logger.info(f"ImageAgent: Generating premium visual assets for {topic}")
         
-        # 1. Generate Context-Aware Prompts with SEO Alt Text
-        prompt_instruction = f"""
-        Based on this content:
-        {content[:2000]}
-        
-        Generate 3 distinct image prompts for a professional blog.
-        Style: Cinematic, high-detail, editorial photography, soft lighting.
-        Include 'alt_text' for SEO for each prompt.
-        Return in format:
-        Prompt | Alt Text
-        """
-        
-        llm_response = genai_client.generate_response_single(prompt_instruction)
-        llm_text = genai_client.extract_pre_post_content(llm_response)
-        lines = llm_text.split("\n")
-        images_data = []
-        
-        # Extract a clean name/slug for image filing
-        image_slug = topic.lower().replace(" ", "-").replace("'", "").replace('"', "")[:50]
 
-        # Process top 3 images (limit for speed/API cost)
-        for line in lines:
-            if "|" in line:
-                prompt_text, alt_text = [x.strip() for x in line.split("|")[:2]]
-                if prompt_text and alt_text:
-                    # Pass the slug for cleaner server-side naming
-                    crm_path, file_path, b64, censored = await horde_client.generate_image_api(prompt_text, post_id, slug=image_slug)
-                    images_data.append({
-                        "prompt": prompt_text,
-                        "alt_text": alt_text,
-                        "crm_path": crm_path,
-                        "file_path": file_path
-                    })
+        images_data = []
+        import random 
+        # Generate random images using Picsum API
+        for i in range(1, 4):
+            width = random.choice([1200, 1000, 800])
+            height = random.choice([600, 500, 400])
+            rand_id = random.randint(1, 1000)
+            url = f"https://picsum.photos/id/{rand_id}/{width}/{height}"
+            images_data.append({
+                "prompt": f"Random visual {i}",
+                "alt_text": f"A representation of {topic}",
+                "crm_path": url,
+                "file_path": url
+            })
         
+        # We always return success so the pipeline is not halted by image failure
         return AgentOutput(
             data={
                 "all_images": images_data,
-                "cover_image": images_data[0] if images_data else {}
+                "cover_image": images_data[0] if len(images_data) > 0 else {}
             },
-            status="success" if images_data else "warning"
+            status="success" if len(images_data) > 0 else "warning"
         )

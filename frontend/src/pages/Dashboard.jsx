@@ -46,6 +46,7 @@ const Dashboard = () => {
     const [analytics, setAnalytics] = useState(null);
     const [loading, setLoading] = useState(true);
     const [topicInput, setTopicInput] = useState('');
+    const [contentType, setContentType] = useState('blog');
     const [isTriggering, setIsTriggering] = useState(false);
 
     const fetchAnalytics = async () => {
@@ -74,7 +75,7 @@ const Dashboard = () => {
             await fetch(`${API_BASE}/generation/trigger`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ user_topic: topicInput.trim(), include_images: true })
+                body: JSON.stringify({ user_topic: topicInput.trim(), include_images: true, content_type: contentType })
             });
             setTopicInput('');
             fetchAnalytics();
@@ -216,15 +217,31 @@ const Dashboard = () => {
                             <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-8 leading-relaxed">Instantiate new autonomous agent layer for deep-dive research.</p>
 
                             <form onSubmit={handleTrigger} className="relative z-10 space-y-4">
-                                <div className="relative">
-                                    <input
-                                        type="text"
-                                        value={topicInput}
-                                        onChange={(e) => setTopicInput(e.target.value)}
-                                        placeholder="Target Intelligence Topic..."
-                                        className="w-full bg-white/5 border border-white/10 rounded-2xl py-5 pl-12 pr-4 text-sm font-bold placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all font-mono"
-                                    />
-                                    <Terminal className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-indigo-500" />
+                                <div className="space-y-3">
+                                    <div className="relative">
+                                        <input
+                                            type="text"
+                                            value={topicInput}
+                                            onChange={(e) => setTopicInput(e.target.value)}
+                                            placeholder="Target Intelligence Topic..."
+                                            className="w-full bg-white/5 border border-white/10 rounded-2xl py-5 pl-12 pr-4 text-sm font-bold placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all font-mono"
+                                        />
+                                        <Terminal className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-indigo-500" />
+                                    </div>
+                                    <div className="relative">
+                                        <select
+                                            value={contentType}
+                                            onChange={(e) => setContentType(e.target.value)}
+                                            className="w-full bg-slate-800 border border-white/10 rounded-2xl py-4 px-4 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all cursor-pointer appearance-none"
+                                        >
+                                            <option value="blog">Blog (Long-form)</option>
+                                            <option value="article">Article (Long-form)</option>
+                                            <option value="instagram">Instagram</option>
+                                            <option value="twitter">Twitter (X)</option>
+                                            <option value="linkedin">LinkedIn</option>
+                                            <option value="meta">Meta (Facebook)</option>
+                                        </select>
+                                    </div>
                                 </div>
                                 <button
                                     disabled={isTriggering || !topicInput.trim()}

@@ -35,7 +35,7 @@ def get_dashboard_analytics(
         return {str(row.date): row.count for row in query}
 
     topics_daily = get_daily_counts(Trending)
-    scrapes_daily = get_daily_counts(Scrape)
+    scrapes_daily = {}  # Scrape model has no created_at field
     posts_daily = get_daily_counts(Post)
     
     # Fill gaps for the chart

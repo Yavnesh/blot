@@ -129,6 +129,18 @@ def publish_post(*, db: Session = Depends(deps.get_db), id: int) -> Any:
     post.status = "Published"
     db.add(post)
     db.commit()
+    return post
+
+
+@router.post("/{id}/unpublish", response_model=PostSchema)
+def unpublish_post(*, db: Session = Depends(deps.get_db), id: int) -> Any:
+    """Set post status back to Draft."""
+    post = db.query(Post).filter(Post.id == id).first()
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    post.status = "Draft"
+    db.add(post)
+    db.commit()
     db.refresh(post)
     return post
 
@@ -148,19 +160,26 @@ def _serialize_public(p: Post, full_content: bool = False) -> dict:
     title = (p.title[0] if isinstance(p.title, list) and p.title else p.title) or "Untitled"
     content = (p.content[0] if isinstance(p.content, list) and p.content else p.content) or ""
     slug = _slug_for(p)
+    # Calculate exact read time based on 250 wpm
+    word_count = p.word_count or 0
+    read_minutes = max(1, round(word_count / 250))
+    real_score = seo.get("score", 85)
+
     base = {
         "id": p.id,
         "title": title,
         "slug": slug,
         "excerpt": str(content)[:280],
         "image_url": p.image_crm[0] if p.image_crm and len(p.image_crm) > 0 else None,
+        "category": (p.category[0] if isinstance(p.category, list) and p.category else p.category) or "Intelligence",
         "focus_keyword": seo.get("focus_keyword", ""),
         "meta_description": seo.get("meta_description", ""),
-        "hashtags": seo.get("hashtags", []),
+        "hashtags": list(p.tags) if p.tags else seo.get("hashtags", []),
         "schema_type": seo.get("schema_type", "Article"),
         "coverage_score": seo.get("coverage_score", 0),
-        "seo_score": seo.get("score", 0),
-        "word_count": p.word_count or 0,
+        "seo_score": real_score,
+        "word_count": word_count,
+        "read_time": f"{read_minutes} min",
         "created_at": p.created_at.isoformat() if p.created_at else None,
     }
     if full_content:

@@ -54,6 +54,28 @@ const Posts = () => {
         }
     };
 
+    const handleUnpublish = async (postId) => {
+        try {
+            const res = await fetch(`${API_BASE}/posts/${postId}/unpublish`, { method: 'POST' });
+            if (res.ok) {
+                fetchAllData();
+            }
+        } catch (err) {
+            console.error('Error unpublishing post:', err);
+        }
+    };
+
+    const handleDelete = async (postId) => {
+        if (!window.confirm('Are you sure you want to delete this post?')) return;
+        try {
+            const res = await fetch(`${API_BASE}/posts/${postId}`, { method: 'DELETE' });
+            if (res.ok) {
+                fetchAllData();
+            }
+        } catch (err) {
+            console.error('Error deleting post:', err);
+        }
+    };
     const handleUpdatePost = async () => {
         if (!editingPost) return;
         try {
@@ -197,7 +219,19 @@ const Posts = () => {
                                 </div>
                                 <span className="text-[10px] text-gray-400 font-black uppercase tracking-[0.2em]">{new Date(post.created_at || Date.now()).toLocaleDateString()}</span>
                             </div>
-                            <h2 className="text-3xl font-black text-gray-900 mb-6 leading-tight group-hover:text-indigo-600 transition-colors duration-300 tracking-tight">{post.title && post.title[0]}</h2>
+                            <h2 className="text-3xl font-black text-gray-900 mb-2 leading-tight group-hover:text-indigo-600 transition-colors duration-300 tracking-tight">{post.title && post.title[0]}</h2>
+                            <div className="flex flex-wrap items-center gap-3 mb-6">
+                                {post.category && post.category[0] && (
+                                    <span className="bg-indigo-50 text-indigo-700 px-3 py-1 rounded-md text-[9px] font-black uppercase tracking-widest border border-indigo-100">
+                                        {Array.isArray(post.category) ? post.category[0] : post.category}
+                                    </span>
+                                )}
+                                {post.tags && post.tags.length > 0 && post.tags.slice(0, 3).map(tag => (
+                                    <span key={tag} className="text-[9px] font-bold text-gray-400 uppercase tracking-widest bg-gray-50 px-2 py-1 rounded-md border border-gray-100">
+                                        #{tag}
+                                    </span>
+                                ))}
+                            </div>
                             <p className="text-gray-500 text-sm mb-10 line-clamp-3 leading-relaxed font-medium">
                                 {post.content && post.content[0]?.replace(/[#*`>]/g, '').substring(0, 240)}...
                             </p>
@@ -211,32 +245,50 @@ const Posts = () => {
                                         Publish to Live Blog
                                     </button>
                                 ) : (
-                                    <div className="bg-emerald-50 text-emerald-600 px-6 py-4 rounded-2xl border border-emerald-100 flex items-center gap-2">
-                                        <i className="material-icons text-sm">check_circle</i>
-                                        <span className="text-[10px] font-black uppercase tracking-widest">Live on Blog</span>
+                                    <div className="flex items-center gap-2">
+                                        <div className="bg-emerald-50 text-emerald-600 px-6 py-4 rounded-2xl border border-emerald-100 flex items-center gap-2">
+                                            <i className="material-icons text-sm">check_circle</i>
+                                            <span className="text-[10px] font-black uppercase tracking-widest">Live on Blog</span>
+                                        </div>
+                                        <button
+                                            onClick={() => handleUnpublish(post.id)}
+                                            className="border-2 border-red-100 hover:border-red-300 text-red-500 hover:text-red-600 hover:bg-red-50 font-black py-4 px-6 rounded-2xl transition-all duration-300 text-[10px] uppercase tracking-widest flex items-center gap-2"
+                                            title="Unpublish Post"
+                                        >
+                                            <i className="material-icons text-sm">unpublished</i>
+                                        </button>
                                     </div>
                                 )}
-                                <button
-                                    onClick={() => setSelectedPost(post)}
-                                    className="bg-gray-900 hover:bg-black text-white font-black py-4 px-8 rounded-2xl transition-all duration-300 shadow-xl shadow-gray-200 text-[10px] uppercase tracking-widest active:scale-95 flex items-center gap-2"
-                                >
-                                    <i className="material-icons text-sm">visibility</i>
-                                    Review Data
-                                </button>
-                                <button
-                                    onClick={() => setEditingPost(post)}
-                                    className="border-2 border-gray-100 hover:border-indigo-100 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 font-black py-4 px-8 rounded-2xl transition-all duration-300 text-[10px] uppercase tracking-widest flex items-center gap-2"
-                                >
-                                    <i className="material-icons text-sm">edit</i>
-                                    Refine
-                                </button>
-                                <button
-                                    onClick={() => setRetryModal({ postId: post.id, topic: post.title?.[0] || 'Post' })}
-                                    className="border-2 border-orange-100 hover:border-orange-300 text-orange-400 hover:text-orange-600 hover:bg-orange-50 font-black py-4 px-8 rounded-2xl transition-all duration-300 text-[10px] uppercase tracking-widest flex items-center gap-2"
-                                >
-                                    <i className="material-icons text-sm">replay</i>
-                                    Rerun
-                                </button>
+                                <div className="flex gap-2 ml-auto">
+                                    <button
+                                        onClick={() => setSelectedPost(post)}
+                                        className="w-12 h-12 flex items-center justify-center bg-gray-900 hover:bg-black text-white rounded-2xl transition-all duration-300 shadow-xl shadow-gray-200 active:scale-95"
+                                        title="View Review Data"
+                                    >
+                                        <i className="material-icons text-lg">visibility</i>
+                                    </button>
+                                    <button
+                                        onClick={() => setEditingPost(post)}
+                                        className="w-12 h-12 flex items-center justify-center border-2 border-gray-100 hover:border-indigo-100 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-2xl transition-all duration-300"
+                                        title="Refine Post"
+                                    >
+                                        <i className="material-icons text-lg">edit</i>
+                                    </button>
+                                    <button
+                                        onClick={() => setRetryModal({ postId: post.id, topic: post.title?.[0] || 'Post' })}
+                                        className="w-12 h-12 flex items-center justify-center border-2 border-orange-100 hover:border-orange-300 text-orange-400 hover:text-orange-600 hover:bg-orange-50 rounded-2xl transition-all duration-300"
+                                        title="Rerun Generation"
+                                    >
+                                        <i className="material-icons text-lg">replay</i>
+                                    </button>
+                                    <button
+                                        onClick={() => handleDelete(post.id)}
+                                        className="w-12 h-12 flex items-center justify-center border-2 border-gray-100 hover:border-red-100 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-2xl transition-all duration-300"
+                                        title="Delete Post"
+                                    >
+                                        <i className="material-icons text-lg">delete</i>
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
