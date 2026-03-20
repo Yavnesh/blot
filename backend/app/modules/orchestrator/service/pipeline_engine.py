@@ -10,6 +10,7 @@ from app.models.task_progress import TaskProgress
 from app.models.post import Post
 from app.models.modular_models import Draft, SEOMetadata
 from app.modules.seo.service.semantic_engine import SemanticCoverageEngine
+from sqlalchemy.orm.attributes import flag_modified
 
 # Import Agents (Legacy Paths)
 from app.agents.intelligence.trend_agent import TrendAgent
@@ -25,6 +26,8 @@ from app.agents.improvement.originality_agent import OriginalityAgent
 from app.agents.governance.legal_agent import LegalAgent
 from app.agents.core.evaluator import EvaluationAgent
 from app.agents.writing.image_agent import ImageAgent
+from app.agents.writing.category_agent import CategoryAgent
+from app.agents.writing.hashtag_agent import HashtagAgent
 
 class PipelineStageLog(BaseModel):
     job_id: str
@@ -57,7 +60,9 @@ class DeterministicPipelineEngine:
             "originality": OriginalityAgent(),
             "legal": LegalAgent(),
             "evaluator": EvaluationAgent(),
-            "image": ImageAgent()
+            "image": ImageAgent(),
+            "category": CategoryAgent(),
+            "hashtag": HashtagAgent()
         }
 
     def _get_db(self):
@@ -93,6 +98,7 @@ class DeterministicPipelineEngine:
                         s["status"] = "running"
                         s["start_time"] = datetime.utcnow().isoformat()
                 progress.steps = steps
+                flag_modified(progress, "steps")
                 db.commit()
             
             agent = self.agents.get(agent_key)
@@ -130,6 +136,8 @@ class DeterministicPipelineEngine:
                                     s["end_time"] = datetime.utcnow().isoformat()
                             progress.steps = steps
                             progress.logs = self.logs # Persist logs in real-time
+                            flag_modified(progress, "steps")
+                            flag_modified(progress, "logs")
                             db.commit()
                         
                         return result.data
@@ -165,6 +173,8 @@ class DeterministicPipelineEngine:
                 progress.steps = steps
                 progress.status = "error"
                 progress.logs = self.logs # Persist final logs
+                flag_modified(progress, "steps")
+                flag_modified(progress, "logs")
                 db.commit()
                 
             raise Exception(f"Stage {stage_name} failed definitively: {log_entry.error}")
@@ -199,6 +209,16 @@ class DeterministicPipelineEngine:
                 
                 self.state["topic"] = topic
                 self.state["trending_id"] = topic_id
+
+                # --- Layer 1.5: Image Reuse Detection ---
+                from app.models.post import Post as PostModel
+                # Check for existing professional images for this topic
+                existing_post = db.query(PostModel).filter(PostModel.title.contains([topic])).order_by(PostModel.created_at.desc()).first()
+                if existing_post and existing_post.image_crm:
+                    logger.info(f"Pipeline: Reusing existing image for topic '{topic}'")
+                    self.state["cover_image"] = {"crm_path": (existing_post.image_crm[0] if isinstance(existing_post.image_crm, list) else existing_post.image_crm)}
+                    self.state["all_images"] = existing_post.all_image_data or []
+                    self.state["image_reused"] = True
             finally:
                 db.close()
 
@@ -217,7 +237,21 @@ class DeterministicPipelineEngine:
             })
 
             # 2b. Credibility Agent (Verification)
-            await self.run_stage("credibility", "Credibility Verification", self.state)
+            credibility_data = await self.run_stage("credibility", "Credibility Verification", self.state)
+            if credibility_data.get("refined_topic"):
+                logger.info(f"Pipeline: Adopting research-refined topic -> '{credibility_data['refined_topic']}'")
+                self.state["topic"] = credibility_data["refined_topic"]
+                # Optional: Update trending record if id is available
+                if self.state.get("trending_id"):
+                    db = self._get_db()
+                    try:
+                        from app.models.trending import Trending
+                        trend = db.query(Trending).get(self.state.get("trending_id"))
+                        if trend:
+                            trend.topic = self.state["topic"]
+                            db.commit()
+                    finally:
+                        db.close()
 
             # 3. Strategy Layers
             await self.run_stage("keyword_cluster", "Keyword Analytics", self.state)
@@ -229,12 +263,19 @@ class DeterministicPipelineEngine:
             
             # 4b. Visual Assets
             if self.state.get("include_images"):
-                await self.run_stage("image", "Visual Generation", self.state, timeout_seconds=600)
+                if not self.state.get("image_reused"):
+                    await self.run_stage("image", "Visual Generation", self.state, timeout_seconds=600)
+                else:
+                    logger.info("Pipeline: Skipping Image stage as existing image was reused.")
 
             # 5. Improvement & SEO Coverage
             await self.run_stage("seo", "SEO Compliance", self.state)
             await self.run_stage("readability", "Flow & Clarity", self.state)
             await self.run_stage("originality", "AI Detection Stealth", self.state)
+            
+            # --- Categorization & Social Logic ---
+            await self.run_stage("category", "Contextual Categorization", self.state)
+            await self.run_stage("hashtag", "Social Semantic Tags", self.state)
             
             # Semantic Coverage Engine Integration
             engine = SemanticCoverageEngine()
@@ -310,6 +351,13 @@ class DeterministicPipelineEngine:
                 if progress:
                     progress.status = "completed"
                     progress.logs = self.logs
+                    
+                    prev = progress.preview_data or {}
+                    prev["post_id"] = new_post.id
+                    progress.preview_data = prev
+                    
+                    flag_modified(progress, "logs")
+                    flag_modified(progress, "preview_data")
                     db.commit()
                     
                 return {"post_id": new_post.id, "telemetry": self.logs}

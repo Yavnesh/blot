@@ -3,16 +3,15 @@ import React, { useState, useEffect } from 'react';
 const InlineAgentStatus = ({ taskId, taskData }) => {
     const [status, setStatus] = useState(taskData || null);
 
+    // Helper for timing
     const formatDuration = (start, end) => {
-        if (!start) return '';
-        const startTime = new Date(start);
-        const endTime = end ? new Date(end) : new Date();
-        const durationMs = endTime - startTime;
-        if (durationMs < 0) return '0s';
-        const seconds = Math.floor(durationMs / 1000);
-        const minutes = Math.floor(seconds / 60);
-        if (minutes > 0) return `${minutes}m ${seconds % 60}s`;
-        return `${seconds}s`;
+        if (!start || !end) return null;
+        const s = typeof start === 'string' ? new Date(start).getTime() / 1000 : start;
+        const e = typeof end === 'string' ? new Date(end).getTime() / 1000 : end;
+        const secs = Math.round(e - s);
+        if (isNaN(secs) || secs < 0) return null;
+        if (secs < 60) return `${secs}s`;
+        return `${Math.floor(secs / 60)}m ${secs % 60}s`;
     };
 
     useEffect(() => {
@@ -140,49 +139,49 @@ const InlineAgentStatus = ({ taskId, taskData }) => {
                 </div>
 
                 <div className="mt-4 bg-slate-50/50 rounded-xl border border-slate-100 p-3 flex flex-col gap-1.5 max-h-48 overflow-y-auto custom-scrollbar">
-                    {['trend', 'credibility', 'semantic', 'intent', 'aggregator', 'draft', 'seo', 'voice', 'readability', 'category', 'hashtag', 'image', 'evaluator'].map(stepName => {
+                    {['trend', 'aggregator', 'credibility', 'keyword_cluster', 'intent', 'draft', 'voice', 'image', 'seo', 'readability', 'originality', 'legal', 'category', 'hashtag', 'evaluator'].map(stepName => {
                         const stepInfo = status.steps?.find(s => s.name.toLowerCase() === stepName);
                         let stateColor = 'text-slate-300';
-                        let icon = 'radio_button_unchecked';
-                        let timeText = '';
-                        let spin = false;
+                        let timeText = formatDuration(stepInfo?.start_time, stepInfo?.end_time) || '--';
+                        const statusText = stepInfo?.status === 'running' ? 'Running' :
+                            (stepInfo?.status === 'error' || stepInfo?.status === 'failed') ? 'Failed' :
+                                ['completed', 'success', 'warning'].includes(stepInfo?.status) ? timeText : '--';
 
+                        let dotClass = 'bg-slate-200';
+                        let textClass = 'text-slate-400 font-medium';
                         if (stepInfo) {
                             if (['completed', 'success', 'warning'].includes(stepInfo.status)) {
-                                stateColor = 'text-emerald-500';
-                                icon = 'check_circle';
-                                timeText = formatDuration(stepInfo.start_time, stepInfo.end_time);
-                            } else if (stepInfo.status === 'error') {
-                                stateColor = 'text-red-500';
-                                icon = 'error';
+                                dotClass = 'bg-green-500';
+                                textClass = 'text-slate-700 font-bold';
+                            } else if (['error', 'failed'].includes(stepInfo.status)) {
+                                dotClass = 'bg-red-500';
+                                textClass = 'text-red-600 font-black';
                             } else if (stepInfo.status === 'running') {
-                                stateColor = 'text-indigo-500';
-                                icon = 'sync';
-                                spin = true;
-                                timeText = 'Running...';
+                                dotClass = 'bg-yellow-400 animate-pulse';
+                                textClass = 'text-yellow-600 font-black';
                             }
                         }
 
                         return (
                             <div key={stepName} className="flex items-center justify-between text-[9px] uppercase tracking-widest p-1.5 hover:bg-white rounded-lg transition-colors border border-transparent hover:border-slate-100 shadow-sm hover:shadow-md">
                                 <div className="flex items-center gap-2">
-                                    <i className={`material-icons text-[12px] ${stateColor} ${spin ? 'animate-spin' : ''}`}>{icon}</i>
-                                    <span className={stepInfo?.status === 'running' ? 'text-indigo-700 font-black' : stepInfo?.status === 'error' ? 'text-red-600 font-black' : stepInfo ? 'text-slate-700 font-bold' : 'text-slate-400 font-medium'}>
+                                    <div className={`w-2 h-2 rounded-full ${dotClass}`}></div>
+                                    <span className={textClass}>
                                         {stepName} Agent
                                     </span>
                                 </div>
-                                <div className={`text-[8px] font-black ${spin ? 'text-indigo-400 animate-pulse' : 'text-slate-400'}`}>
-                                    {timeText || '--'}
+                                <div className={`text-[8px] font-black ${stepInfo?.status === 'running' ? 'text-yellow-500' : 'text-slate-400'}`}>
+                                    {statusText}
                                 </div>
                             </div>
                         );
                     })}
                 </div>
 
-                {status.logs && status.logs.length > 0 && (
+                {status.logs && status.logs.length > 0 && status.logs[status.logs.length - 1]?.feedback && (
                     <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 pt-4 border-t border-slate-100 mt-4">
                         <i className="material-icons text-[14px] text-indigo-400">psychology</i>
-                        <span className="truncate italic">"{status.logs[status.logs.length - 1].feedback || 'Processing intent...'}"</span>
+                        <span className="truncate italic">"{status.logs[status.logs.length - 1].feedback}"</span>
                     </div>
                 )}
             </div>
@@ -257,19 +256,27 @@ const Topics = () => {
         return () => clearInterval(interval);
     }, []);
 
-    const handleCreatePost = async (topic) => {
+    // Unified trigger handler
+    const handleTriggerPipeline = async (topicId, options) => {
+        setPipelineModal(null);
         try {
             const response = await fetch('http://localhost:8080/api/v1/generation/trigger', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ topic_id: topic.id, limit: 1 })
+                body: JSON.stringify({
+                    topic_id: topicId,
+                    limit: 1,
+                    include_images: options.includeImages,
+                    image_provider: options.imageProvider,
+                    reuse_scrape: options.reuseScrape
+                })
             });
             if (!response.ok) throw new Error('Generation trigger failed');
             const data = await response.json();
 
             setGeneratingTopics(prev => ({
                 ...prev,
-                [topic.id]: data.task_id
+                [topicId]: data.task_id
             }));
 
             // Refresh to catch the new task
@@ -279,28 +286,10 @@ const Topics = () => {
         }
     };
 
-    const [retryModal, setRetryModal] = useState(null); // { topicId, topicName }
+    const [pipelineModal, setPipelineModal] = useState(null); // { topicId, topicName, isRetry: bool }
+    const [configOptions, setConfigOptions] = useState({ reuseScrape: false, includeImages: true, imageProvider: 'google' });
 
-    const handleRetry = async (topicId, reuseCache) => {
-        setRetryModal(null);
-        try {
-            const res = await fetch('http://localhost:8080/api/v1/generation/trigger', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    topic_id: topicId,
-                    reuse_scrape: reuseCache,
-                    include_images: false
-                })
-            });
-            if (!res.ok) throw new Error('Failed to trigger retry');
-            const data = await res.json();
-            setGeneratingTopics(prev => ({ ...prev, [topicId]: data.task_id }));
-            fetchData();
-        } catch (err) {
-            alert('Retry failed: ' + err.message);
-        }
-    };
+
 
     if (error && topics.length === 0) return <div className="p-8 text-red-600 bg-red-50 rounded-3xl m-4 font-black uppercase tracking-widest text-center border-2 border-red-100">Error: {error}</div>;
 
@@ -374,20 +363,35 @@ const Topics = () => {
 
                             <div className="px-8 py-6 bg-slate-50/50 border-t border-slate-100 mt-auto flex gap-3">
                                 <button
-                                    onClick={() => handleCreatePost(topic)}
-                                    className={`flex-1 font-black py-4 rounded-2xl transition-all duration-300 text-[10px] uppercase tracking-widest active:scale-[0.98] ${taskId ? 'bg-white border-2 border-slate-200 text-slate-400 shadow-sm' : 'bg-slate-900 hover:bg-indigo-600 text-white shadow-xl shadow-slate-900/10'
+                                    onClick={() => {
+                                        if (latestTask?.status === 'completed') {
+                                            const postId = latestTask.preview_data?.post_id || '';
+                                            window.location.href = `/posts${postId ? `?post_id=${postId}` : ''}`;
+                                        } else {
+                                            setPipelineModal({ topicId: topic.id, topicName: topic.topic, isRetry: false });
+                                            setConfigOptions({ reuseScrape: false, includeImages: true, imageProvider: 'google' });
+                                        }
+                                    }}
+                                    className={`flex-1 font-black py-4 rounded-2xl transition-all duration-300 text-[10px] uppercase tracking-widest active:scale-[0.98] ${latestTask?.status === 'completed' ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-xl shadow-indigo-500/20' : taskId ? 'bg-white border-2 border-slate-200 text-slate-400 shadow-sm' : 'bg-slate-900 hover:bg-indigo-600 text-white shadow-xl shadow-slate-900/10'
                                         }`}
-                                    disabled={!!taskId && (latestTask?.status === 'running' || generatingTopics[topic.id])}
+                                    disabled={!!taskId && (latestTask?.status === 'running' || generatingTopics[topic.id]) && latestTask?.status !== 'completed'}
                                 >
                                     {taskId && (latestTask?.status === 'running' || generatingTopics[topic.id]) ? (
                                         <div className="flex items-center justify-center gap-2">
                                             <i className="material-icons text-[14px] animate-spin">sync</i> ORCHESTRATING...
                                         </div>
+                                    ) : latestTask?.status === 'completed' ? (
+                                        <div className="flex items-center justify-center gap-2">
+                                            <i className="material-icons text-[14px]">auto_stories</i> View Authority Post
+                                        </div>
                                     ) : 'Create Authority Post'}
                                 </button>
                                 {(latestTask?.status === 'completed' || latestTask?.status === 'error') && (
                                     <button
-                                        onClick={() => setRetryModal({ topicId: topic.id, topicName: topic.topic })}
+                                        onClick={() => {
+                                            setPipelineModal({ topicId: topic.id, topicName: topic.topic, isRetry: true });
+                                            setConfigOptions({ reuseScrape: true, includeImages: true, imageProvider: 'google' });
+                                        }}
                                         title="Rerun pipeline for this topic"
                                         className="w-14 h-14 mt-auto flex items-center justify-center rounded-2xl border-2 border-amber-100 text-amber-500 hover:bg-amber-50 hover:border-amber-300 bg-white transition-all shadow-sm"
                                     >
@@ -407,50 +411,80 @@ const Topics = () => {
                 </div>
             )}
 
-            {/* Retry Choice Modal */}
-            {retryModal && (
+            {/* Unified Pipeline Configuration Modal */}
+            {pipelineModal && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-[2rem] max-w-md w-full p-8 shadow-2xl">
                         <div className="flex items-center gap-3 mb-2">
-                            <div className="w-10 h-10 rounded-2xl bg-orange-50 flex items-center justify-center">
-                                <i className="material-icons text-orange-500">replay</i>
+                            <div className={`w-10 h-10 rounded-2xl flex items-center justify-center ${pipelineModal.isRetry ? 'bg-orange-50' : 'bg-indigo-50'}`}>
+                                <i className={`material-icons ${pipelineModal.isRetry ? 'text-orange-500' : 'text-indigo-500'}`}>{pipelineModal.isRetry ? 'replay' : 'start'}</i>
                             </div>
-                            <h2 className="text-xl font-black text-gray-900">Rerun Pipeline</h2>
+                            <h2 className="text-xl font-black text-gray-900">{pipelineModal.isRetry ? 'Rerun Pipeline' : 'Initialize Pipeline'}</h2>
                         </div>
                         <p className="text-[11px] text-gray-500 font-medium mb-6">
-                            Regenerating: <span className="font-black text-gray-800 italic">{retryModal.topicName}</span>
+                            Target: <span className="font-black text-gray-800 italic">{pipelineModal.topicName}</span>
                         </p>
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Choose Data Source</p>
-                        <div className="space-y-3 mb-8">
-                            <button
-                                onClick={() => handleRetry(retryModal.topicId, true)}
-                                className="w-full text-left p-5 rounded-2xl border-2 border-indigo-100 bg-indigo-50 hover:border-indigo-400 transition-all"
-                            >
-                                <div className="flex items-center gap-3 mb-1">
-                                    <i className="material-icons text-indigo-500 text-lg">inventory_2</i>
-                                    <span className="text-sm font-black text-gray-900">Reuse Cached Data</span>
-                                    <span className="ml-auto text-[8px] font-black bg-green-100 text-green-600 px-2 py-0.5 rounded-full uppercase">0 API Calls</span>
+
+                        <div className="space-y-4 mb-8">
+                            <div>
+                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Image Generation Engine</p>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <button
+                                        onClick={() => setConfigOptions({ ...configOptions, imageProvider: 'google' })}
+                                        className={`p-3 rounded-xl border-2 text-left transition-all ${configOptions.imageProvider === 'google' ? 'border-indigo-500 bg-indigo-50/50' : 'border-slate-100 hover:border-slate-300'}`}
+                                    >
+                                        <div className="flex items-center justify-between mb-1">
+                                            <span className={`text-[11px] font-black ${configOptions.imageProvider === 'google' ? 'text-indigo-700' : 'text-slate-600'}`}>Google API</span>
+                                            {configOptions.imageProvider === 'google' && <i className="material-icons text-[14px] text-indigo-500">check_circle</i>}
+                                        </div>
+                                        <p className="text-[9px] text-slate-500 leading-tight">Default Engine</p>
+                                    </button>
+                                    <button
+                                        onClick={() => setConfigOptions({ ...configOptions, imageProvider: 'horde' })}
+                                        className={`p-3 rounded-xl border-2 text-left transition-all ${configOptions.imageProvider === 'horde' ? 'border-indigo-500 bg-indigo-50/50' : 'border-slate-100 hover:border-slate-300'}`}
+                                    >
+                                        <div className="flex items-center justify-between mb-1">
+                                            <span className={`text-[11px] font-black ${configOptions.imageProvider === 'horde' ? 'text-indigo-700' : 'text-slate-600'}`}>Horde Client</span>
+                                            {configOptions.imageProvider === 'horde' && <i className="material-icons text-[14px] text-indigo-500">check_circle</i>}
+                                        </div>
+                                        <p className="text-[9px] text-slate-500 leading-tight">Stable Diffusion Worker</p>
+                                    </button>
                                 </div>
-                                <p className="text-[10px] text-gray-500 pl-8">Skip GNews — regenerate from previously scraped sources. Zero quota cost.</p>
+                            </div>
+
+                            <label className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100 cursor-pointer hover:bg-slate-100 transition-colors">
+                                <input type="checkbox" className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500" checked={configOptions.includeImages} onChange={(e) => setConfigOptions({ ...configOptions, includeImages: e.target.checked })} />
+                                <div>
+                                    <p className="text-[11px] font-black text-slate-700">Include Images</p>
+                                    <p className="text-[9px] text-slate-500">Run visual generation nodes</p>
+                                </div>
+                            </label>
+
+                            {pipelineModal.isRetry && (
+                                <label className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100 cursor-pointer hover:bg-slate-100 transition-colors">
+                                    <input type="checkbox" className="w-4 h-4 text-orange-600 rounded focus:ring-orange-500" checked={configOptions.reuseScrape} onChange={(e) => setConfigOptions({ ...configOptions, reuseScrape: e.target.checked })} />
+                                    <div>
+                                        <p className="text-[11px] font-black text-slate-700">Reuse Cached Data</p>
+                                        <p className="text-[9px] text-slate-500">Skip fetching new GNews data</p>
+                                    </div>
+                                </label>
+                            )}
+                        </div>
+
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setPipelineModal(null)}
+                                className="flex-1 bg-gray-100 text-gray-500 font-black py-4 rounded-2xl hover:bg-gray-200 transition-all text-[10px] uppercase tracking-widest"
+                            >
+                                Cancel
                             </button>
                             <button
-                                onClick={() => handleRetry(retryModal.topicId, false)}
-                                className="w-full text-left p-5 rounded-2xl border-2 border-gray-100 hover:border-orange-200 transition-all"
+                                onClick={() => handleTriggerPipeline(pipelineModal.topicId, configOptions)}
+                                className="flex-1 bg-indigo-600 text-white font-black py-4 rounded-2xl hover:bg-indigo-700 shadow-xl shadow-indigo-500/20 transition-all text-[10px] uppercase tracking-widest flex items-center justify-center gap-2"
                             >
-                                <div className="flex items-center gap-3 mb-1">
-                                    <i className="material-icons text-orange-500 text-lg">travel_explore</i>
-                                    <span className="text-sm font-black text-gray-900">Scrape Fresh Data</span>
-                                    <span className="ml-auto text-[8px] font-black bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full uppercase">Live Search</span>
-                                </div>
-                                <p className="text-[10px] text-gray-500 pl-8">Fresh GNews search before regenerating — latest data, more API tokens.</p>
+                                <i className="material-icons text-[14px]">bolt</i> Launch
                             </button>
                         </div>
-                        <button
-                            onClick={() => setRetryModal(null)}
-                            className="w-full bg-gray-100 text-gray-500 font-black py-4 rounded-2xl hover:bg-gray-200 transition-all text-[10px] uppercase tracking-widest"
-                        >
-                            Cancel
-                        </button>
                     </div>
                 </div>
             )}

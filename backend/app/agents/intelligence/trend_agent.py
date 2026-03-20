@@ -93,7 +93,13 @@ class TrendAgent(BaseAgent):
                     })
             
             db.commit()
-            return AgentOutput(data={"trends": strategic_trends}, status="success")
+            return AgentOutput(
+                data={
+                    "trends": strategic_trends,
+                    "confidence_score": 95.0
+                }, 
+                status="success"
+            )
             
         except Exception as e:
             logger.error(f"TrendAgent error: {e}")

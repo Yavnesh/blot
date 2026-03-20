@@ -34,11 +34,11 @@ class Settings(BaseSettings):
     ] # React and localhost
 
     # External APIs
-    GEMINI_API_KEY_1: str = "AIzaSyA-C-ONNj0jm90WiZPBEibDn0L3fvrys40"
+    GEMINI_API_KEY_1: str = "AIzaSyAu4NGmJeJIBxz_-wyHK0HPkyEO0gOwW9M"
     # ... (rest of keys)
-    GEMINI_API_KEY_2: str = "AIzaSyCaYJ7_D3_6_xB3jfS_UTwMPxoP2ssIbkk"
-    GEMINI_API_KEY_3: str = "AIzaSyAdlRe6MaqzN_mQsNfHdqcV_QOmfQwwDEY"
-    GEMINI_API_KEY_4: str = "AIzaSyDdIhcWY0GKZqH0FuUf1--zgCXlLqXYOxo"
+    GEMINI_API_KEY_2: str = "AIzaSyA4XjYd2iWjgBKblGtaFYTvrC5FgfhKSco"
+    GEMINI_API_KEY_3: str = "AIzaSyBs4d5LZqNMMi_CYoS-JlzCbvpu6TwL3fw"
+    GEMINI_API_KEY_4: str = "AIzaSyAn13XT6Iu0rJBw7oGvfoKCjQIPqv0F1GA"
     GEMINI_API_KEY_5: str = ""
     GEMINI_API_KEY_6: str = ""
 

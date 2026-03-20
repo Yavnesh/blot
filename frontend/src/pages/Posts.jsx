@@ -84,7 +84,7 @@ const Posts = () => {
             const updatedTitle = titleInput?.value || editingPost.title?.[0];
             const updatedContent = contentInput?.value || editingPost.content?.[0];
             const res = await fetch(`${API_BASE}/posts/${editingPost.id}`, {
-                method: 'PATCH',
+                method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ title: [updatedTitle], content: [updatedContent] })
             });
@@ -178,7 +178,7 @@ const Posts = () => {
                         <div className="md:w-1/3 h-64 md:h-auto bg-gray-50 relative group overflow-hidden flex items-center justify-center border-r-[1px] border-gray-50">
                             {post.image_crm?.[0] ? (
                                 <img
-                                    src={`http://localhost:8080/${post.image_crm[0]}`}
+                                    src={post.image_crm[0].startsWith('http') ? post.image_crm[0] : `http://localhost:8080/${post.image_crm[0]}`}
                                     alt={post.title?.[0]}
                                     className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                                 />

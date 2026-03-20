@@ -112,7 +112,7 @@ const ArticlePreview = ({ post, onBack, onUpdate }) => {
         .replace(/^\*+\s*\n?/gm, '')
         .replace(/^#+\s*H\d:\s*/gim, '# ')
         // Strip common AI preamble sentences
-        .replace(/^(This refined version|This refined draft|This version|This article|This draft|This content|The following draft).{0,100}(voice|tone|audience|flow|narrative|SEO|keyword|expert|deep-dive|brand).{0,60}\.\n?/gim, '')
+        .replace(/^(This refined version|This refined draft|This version|This article|This draft|This content|The following draft|Here is the|I have updated|I have refined).{0,120}(voice|tone|audience|flow|narrative|SEO|keyword|expert|deep-dive|brand|draft|article|style|instruction).{0,60}[:.]\s*\n?/gim, '')
         .replace(/^\s+/, '');
 
     // Handle redundant titles at the top
@@ -199,9 +199,9 @@ const ArticlePreview = ({ post, onBack, onUpdate }) => {
                             )}
                         </div>
                         <div className="flex flex-wrap gap-2 mb-8">
-                            {post.tags && post.tags.map(tag => (
+                            {post.tags && (Array.isArray(post.tags) ? post.tags : [post.tags]).map(tag => (
                                 <span key={tag} className="text-[10px] font-bold text-slate-400 capitalize bg-slate-50 px-3 py-1 rounded-md border border-slate-100">
-                                    #{tag}
+                                    {tag.startsWith('#') ? tag : `#${tag}`}
                                 </span>
                             ))}
                         </div>
@@ -284,7 +284,7 @@ const ArticlePreview = ({ post, onBack, onUpdate }) => {
                                                 </div>
                                                 <div className="text-right">
                                                     <div className="text-[14px] font-black text-indigo-600 tracking-tighter">
-                                                        {Math.round((log.confidence_score || 0) * 100)}%
+                                                        {Math.round(log.confidence_score > 1 ? log.confidence_score : (log.confidence_score || 0) * 100)}%
                                                     </div>
                                                     <p className="text-[7px] font-black text-slate-300 uppercase tracking-widest">Confidence</p>
                                                 </div>

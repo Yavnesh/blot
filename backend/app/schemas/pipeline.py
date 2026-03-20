@@ -7,4 +7,5 @@ class PipelineTrigger(BaseModel):
     post_id: Optional[int] = None       # Retry from existing post's topic
     limit: int = 1
     include_images: bool = True
+    image_provider: Optional[str] = 'google'
     reuse_scrape: bool = False           # If True, skip GNews and reuse existing scraped data

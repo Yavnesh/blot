@@ -20,7 +20,7 @@ class PostBase(BaseModel):
     image_data: Optional[List[str]] = []
     image_path: Optional[List[str]] = []
     image_crm: Optional[List[str]] = []
-    all_image_data: Optional[List[str]] = []
+    all_image_data: Optional[List[Any]] = []
     rep_count: Optional[str] = '0'
     
     # Newly added fields so the API exposes them

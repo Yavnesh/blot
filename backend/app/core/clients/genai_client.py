@@ -11,6 +11,9 @@ class MockResponse:
         self.text = text
         self.candidates = [None] # Minimal candidate structure for extract_pre_post_content
 
+# Track keys that are known to be bad (leaked, disabled, etc.) permanently for the current process session
+leaked_keys = set()
+
 def get_all_api_keys():
     keys = [
         settings.GEMINI_API_KEY_1,
@@ -25,17 +28,23 @@ def get_all_api_keys():
 def assign_random_api(exclude_keys=None):
     if exclude_keys is None:
         exclude_keys = []
-    apis_list = [k for k in get_all_api_keys() if k not in exclude_keys]
+    
+    # Filter out keys that are either temporarily excluded (rate-limited) or permanently bad (leaked)
+    apis_list = [k for k in get_all_api_keys() if k not in exclude_keys and k not in leaked_keys]
     
     if not apis_list:
-        # If all keys exhausted, try all available keys as a last resort
+        # If all keys were reported leaked/failed, clear the set once to allow retry
+        # especially useful if keys were updated without process restart
+        logger.warning("All Gemini keys were blacklisted. Clearing blacklist to retry.")
+        leaked_keys.clear()
         apis_list = get_all_api_keys()
-        if not apis_list:
-            raise ValueError("No Gemini API keys configured")
+        
+    if not apis_list:
+        raise ValueError("No Gemini API keys configured (list is empty)")
         
     selected_api = random.choice(apis_list)
     genai.configure(api_key=selected_api)
-    model = genai.GenerativeModel('gemini-flash-latest')
+    model = genai.GenerativeModel('gemini-2.5-flash')
 
     safety_setting={
         HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
@@ -46,10 +55,10 @@ def assign_random_api(exclude_keys=None):
     return model, safety_setting, selected_api
 
 def generate_response_single(prompt):
-    all_keys = get_all_api_keys()
+    all_keys = [k for k in get_all_api_keys() if k not in leaked_keys]
     exclude_keys = []
-    # Try at least as many times as we have keys, plus a couple extra retries with backoff
-    max_total_attempts = len(all_keys) + 2
+    # Try as many times as we have non-leaked keys
+    max_total_attempts = max(len(all_keys), 1)
     
     for attempt in range(max_total_attempts):
         try:
@@ -57,22 +66,79 @@ def generate_response_single(prompt):
             response = model.generate_content(prompt, safety_settings=safety_setting)
             return response
         except Exception as e:
-            if "429" in str(e):
+            err_str = str(e)
+            if "429" in err_str:
                 logger.warning(f"Key rate limited (429). Rotating key... (Attempt {attempt+1}/{max_total_attempts})")
                 exclude_keys.append(current_key)
-                # If we've tried all keys, wait longer before starting over
-                wait_time = 5 if len(exclude_keys) >= len(all_keys) else 2
-                time.sleep(wait_time)
+                time.sleep(2)
+            elif "API key was reported as leaked" in err_str or "403" in err_str or "404" in err_str:
+                logger.error(f"API Key reported leaked, invalid, or 404 restricted. Blacklisting key and rotating... Key: {current_key[:6]}***")
+                leaked_keys.add(current_key)
+                exclude_keys.append(current_key)
+                continue # Retry immediately with another key
             else:
                 logger.error(f"Gemini API error: {e}")
                 raise e
-    logger.error("All Gemini API keys exhausted or rate limited definitively. Falling back to MOCK response for testing.")
-    return MockResponse("This is a MOCK response for testing. The real API is rate limited. [MOCK DATA]")
+    
+    logger.error("All Gemini API keys exhausted (leaked or rate-limited). Returning Mock Response.")
+    return MockResponse("This is a MOCK response for testing. The real API keys are unavailable. [MOCK DATA]")
+
+def generate_structured(prompt, output_schema):
+    all_keys = [k for k in get_all_api_keys() if k not in leaked_keys]
+    exclude_keys = []
+    max_total_attempts = max(len(all_keys), 1)
+    
+    for attempt in range(max_total_attempts):
+        try:
+            model, safety_setting, current_key = assign_random_api(exclude_keys)
+            
+            # Use structure for Pydantic schema directly if supported by generation config
+            generation_config = genai.GenerationConfig(
+                response_mime_type="application/json",
+                response_schema=output_schema
+            )
+            
+            response = model.generate_content(prompt, safety_settings=safety_setting, generation_config=generation_config)
+            
+            # Defensive check for safety blocks in structured generation
+            try:
+                # Accessing .text will throw if blocked
+                _ = response.text
+            except (ValueError, Exception) as safety_err:
+                if "PROHIBITED_CONTENT" in str(safety_err) or not getattr(response, 'candidates', None):
+                    logger.warning(f"Structured Generation BLOCKED by safety filters. Key: {current_key[:6]}***")
+                    # Fallback to mock data based on schema for structured parsing safety
+                    import json
+                    mock_data = {k: 0 if t==int else (0.0 if t==float else "BLOCKED_CONTENT") for k, t in output_schema.__annotations__.items()}
+                    return MockResponse(json.dumps(mock_data))
+                raise safety_err
+
+            return response
+        except Exception as e:
+            err_str = str(e)
+            if "429" in err_str:
+                logger.warning(f"Key rate limited (429). Rotating key... (Attempt {attempt+1}/{max_total_attempts})")
+                exclude_keys.append(current_key)
+                time.sleep(2)
+            elif "API key was reported as leaked" in err_str or "403" in err_str or "404" in err_str:
+                logger.error(f"API Key reported leaked, invalid, or 404 restricted. Blacklisting key and rotating... Key: {current_key[:6]}***")
+                leaked_keys.add(current_key)
+                exclude_keys.append(current_key)
+                continue
+            else:
+                logger.error(f"Gemini API structured error: {e}")
+                raise e
+                
+    logger.error("All Gemini API keys exhausted for structured content. Returning Mock Response.")
+    # Return mock payload referencing the schema
+    import json
+    mock_data = {k: 0 if t==int else (0.0 if t==float else "Mock") for k, t in output_schema.__annotations__.items()}
+    return MockResponse(json.dumps(mock_data))
 
 def generate_response_chat(prompt, messages):
-    all_keys = get_all_api_keys()
+    all_keys = [k for k in get_all_api_keys() if k not in leaked_keys]
     exclude_keys = []
-    max_total_attempts = len(all_keys) + 2
+    max_total_attempts = max(len(all_keys), 1)
     
     for attempt in range(max_total_attempts):
         try:
@@ -89,15 +155,21 @@ def generate_response_chat(prompt, messages):
             messages.append({'role': 'model', 'parts': [response.text]})
             return messages, response
         except Exception as e:
-            if "429" in str(e):
+            err_str = str(e)
+            if "429" in err_str:
                 logger.warning(f"Key rate limited (429) in chat. Rotating key... (Attempt {attempt+1}/{max_total_attempts})")
                 exclude_keys.append(current_key)
-                wait_time = 5 if len(exclude_keys) >= len(all_keys) else 2
-                time.sleep(wait_time)
+                time.sleep(2)
+            elif "API key was reported as leaked" in err_str or "403" in err_str or "404" in err_str:
+                logger.error(f"API Key leaked, invalid or 404 restricted in chat. Blacklisting and rotating... Key: {current_key[:6]}***")
+                leaked_keys.add(current_key)
+                exclude_keys.append(current_key)
+                continue
             else:
                 logger.error(f"Gemini API chat error: {e}")
                 raise e
-    logger.error("All Gemini API keys exhausted or rate limited definitively in chat. Falling back to MOCK response for testing.")
+    
+    logger.error("All Gemini keys exhausted in chat. Returning Mock.")
     messages.append({'role': 'user', 'parts': [prompt]})
     messages.append({'role': 'model', 'parts': ["MOCK chat response. [MOCK DATA]"]})
     return messages, MockResponse("MOCK chat response. [MOCK DATA]")
@@ -113,7 +185,13 @@ def extract_pre_post_content(response):
             logger.error(f"Error accessing parts: {e}")
             return ""
     elif hasattr(response, 'text'):
-        return response.text
+        try:
+            return response.text
+        except (ValueError, Exception):
+            # Known Gemini block or error
+            if hasattr(response, 'prompt_feedback'):
+                logger.warning(f"Response extracted as empty due to safety block: {response.prompt_feedback}")
+            return "Safety Block: Potential prohibited content detected."
     return ""
 
 def generate_image_prompt(merged_content):

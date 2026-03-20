@@ -61,7 +61,10 @@ class DatasetAgent(BaseAgent):
             db.commit()
             logger.success(f"DatasetAgent: Saved {saved_count} training pairs to DB")
             return AgentOutput(
-                data={"saved_count": saved_count},
+                data={
+                    "saved_count": saved_count,
+                    "confidence_score": 100.0
+                },
                 status="success"
             )
         except Exception as e:

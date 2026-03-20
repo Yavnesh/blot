@@ -25,3 +25,5 @@ sentry-sdk
 opentelemetry-api
 opentelemetry-sdk
 opentelemetry-instrumentation-fastapi
+textstat
+httpx

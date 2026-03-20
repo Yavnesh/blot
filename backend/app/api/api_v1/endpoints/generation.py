@@ -25,6 +25,7 @@ async def trigger_pipeline(
     post_id = trigger_in.post_id
     limit = trigger_in.limit
     include_images = trigger_in.include_images
+    image_provider = trigger_in.image_provider
     reuse_scrape = trigger_in.reuse_scrape
     task_id = str(uuid.uuid4())
     topic_name = user_topic or "Auto-selected Trending"
@@ -76,6 +77,7 @@ async def trigger_pipeline(
         "user_topic": user_topic,
         "post_id": post_id,
         "include_images": include_images,
+        "image_provider": image_provider,
         "reuse_scrape": reuse_scrape,
         "task_id": task_id
     }
@@ -123,6 +125,7 @@ async def get_all_tasks_status(
             "current_step": t.current_step,
             "steps": t.steps,
             "logs": t.logs,
+            "preview_data": t.preview_data,
             "updated_at": t.updated_at
         } for t in tasks
     ]

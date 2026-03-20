@@ -1,3 +1,4 @@
+import asyncio
 from typing import Dict, Any, List, Optional
 from loguru import logger
 from app.agents.core.orchestrator import Orchestrator
@@ -42,19 +43,16 @@ class EditorialOrchestrator(Orchestrator):
 
     async def run_editorial_workflow(self, db, topic_id: Optional[int] = None, user_topic: Optional[str] = None, target_audience: str = "General", task_id: Optional[str] = None, include_images: bool = False, reuse_scrape: bool = False):
         """
-        Full 6-layer agentic editorial workflow with dual-mode (Auto/User).
+        Full 6-layer agentic editorial workflow with parallel execution and Dataset integration.
         """
         self.state["db"] = db
         self.state["task_id"] = task_id
         self.state["target_audience"] = target_audience
 
-        # Workflow Selection
+        # --- Layer 1: Discovery ---
         if user_topic:
-            # Workflow B: User-Initiated Topic Mode
-            logger.info(f"Orchestrator: Running Workflow B for topic '{user_topic}'")
+            logger.info(f"Orchestrator: Manual Topic Mode -> '{user_topic}'")
             self.state["topic"] = user_topic
-            
-            # Ensure Trending record exists
             from app.models.trending import Trending
             trend = db.query(Trending).filter(Trending.topic == user_topic).first()
             if not trend:
@@ -63,158 +61,197 @@ class EditorialOrchestrator(Orchestrator):
                 db.commit()
                 db.refresh(trend)
             topic_id = trend.id
-            # (Keyword cluster + SERP blueprint handled by dedicated agents below)
         elif topic_id:
-            # Workflow A/B hybrid: User selected from Trends
             from app.models.trending import Trending
             trend = db.query(Trending).get(topic_id)
             self.state["topic"] = trend.topic if trend else f"Topic {topic_id}"
-            logger.info(f"Orchestrator: Running Workflow B for existing trend '{self.state['topic']}'")
         else:
-            # Workflow A: Fully Autonomous Mode
-            logger.info("Orchestrator: Running Workflow A (Fully Autonomous)")
+            logger.info("Orchestrator: Fully Autonomous Discovery")
             trend_result = await self.execute_task("trend", {"db": db})
             if trend_result.status != "success": return None
-            
-            # Select top-scoring trend
             trends = trend_result.data.get("trends", [])
             if not trends: return None
             selected = sorted(trends, key=lambda x: x.get("score", 0), reverse=True)[0]
             self.state["topic"] = selected.get("topic")
             topic_id = selected.get("id")
 
-        # Layer 2: Research
+        # --- Layer 1.5: Image Reuse Detection ---
+        from app.models.post import Post as PostModel
+        # Check if a post with this topic already exists and has an image
+        existing_post = db.query(PostModel).filter(PostModel.title.contains([self.state["topic"]])).order_by(PostModel.created_at.desc()).first()
+        if existing_post and existing_post.image_crm:
+            logger.info(f"Orchestrator: Detected existing images for topic '{self.state['topic']}'. Reusing.")
+            self.state["image"] = {"image_crm": existing_post.image_crm, "reused": True}
+
+        # --- Layer 2: Research ---
         research_result = await self.execute_task("aggregator", {
             "db": db,
             "trending_id": topic_id,
             "topic": self.state["topic"],
-            "reuse_scrape": reuse_scrape  # Pass the flag into the agent
+            "reuse_scrape": reuse_scrape
         })
         self.state["research_data"] = research_result.data.get("research_data", [])
-        await self.execute_task("credibility", self.state)
+        credibility_result = await self.execute_task("credibility", self._get_flattened_state())
         
-        # UI SCAFFOLDING: Update Fact Count
+        # Adopt Fresh Topic from Research if available
+        if credibility_result.status == "success":
+            refined = credibility_result.data.get("refined_topic")
+            if refined and len(refined) > 5:
+                logger.info(f"Orchestrator: Updating topic from '{self.state['topic']}' to REFINED -> '{refined}'")
+                self.state["topic"] = refined
+        
+        # Dataset Deep Dive (trigger for data-heavy niches)
+        topic_lower = self.state["topic"].lower()
+        if any(token in topic_lower for token in ["science", "finance", "crypto", "data", "tech", "market", "economy"]):
+            logger.info("Orchestrator: Data-heavy topic detected. Triggering DatasetAgent.")
+            await self.execute_task("dataset", self._get_flattened_state())
+
         if task_id:
             from app.models.task_progress import TaskProgress
             progress = db.query(TaskProgress).filter(TaskProgress.task_id == task_id).first()
             if progress:
-                preview = progress.preview_data or {}
-                preview["fact_count"] = len(self.state["research_data"])
+                preview = dict(progress.preview_data or {})
+                preview["fact_count"] = len(self.state.get("research_data", []))
                 progress.preview_data = preview
                 db.commit()
 
-        # Layer 3: Strategy — Keyword Cluster first, then SERP Blueprint
-        await self.execute_task("keyword_cluster", self.state)
+        # --- Layer 3: Strategy ---
+        await self.execute_task("keyword_cluster", self._get_flattened_state())
+        await self.execute_task("intent", self._get_flattened_state())
         
-        # UI SCAFFOLDING: Update primary keyword in preview
-        if task_id:
-            from app.models.task_progress import TaskProgress
-            progress = db.query(TaskProgress).filter(TaskProgress.task_id == task_id).first()
-            if progress:
-                preview = progress.preview_data or {}
-                preview["primary_keyword"] = self.state.get("primary_keyword", self.state.get("topic"))
-                preview["search_intent"] = self.state.get("search_intent", "informational")
-                progress.preview_data = preview
-                db.commit()
-
-        await self.execute_task("intent", self.state)
-        
-        # UI SCAFFOLDING: Update Headline
         if task_id:
             progress = db.query(TaskProgress).filter(TaskProgress.task_id == task_id).first()
             if progress:
-                preview = progress.preview_data or {}
-                preview["headline"] = self.state.get("topic")
+                preview = dict(progress.preview_data or {})
+                preview["primary_keyword"] = self.state.get("keyword_cluster", {}).get("primary_keyword", self.state["topic"])
+                preview["search_intent"] = self.state.get("intent", {}).get("search_intent", "informational")
+                preview["headline"] = self.state["topic"]
                 progress.preview_data = preview
                 db.commit()
 
-        # Layer 4: Writing (Now handles both long-form and short-form)
-        await self.execute_task("writer", self.state)
-        
-        # UI SCAFFOLDING: Update Outline Preview
-        if task_id:
-            progress = db.query(TaskProgress).filter(TaskProgress.task_id == task_id).first()
-            if progress:
-                preview = progress.preview_data or {}
-                # Extract first 3 lines as outline preview
-                draft = self.state.get("draft_content", "")
-                preview["outline"] = "\n".join(draft.split("\n")[:3]) + "..."
-                progress.preview_data = preview
-                db.commit()
-
-        await self.execute_task("voice", self.state)
+        # --- Layer 4: Creation ---
+        await self.execute_task("writer", self._get_flattened_state())
+        await self.execute_task("voice", self._get_flattened_state())
         
         if include_images:
-            await self.execute_task("image", self.state)
-        else:
-            logger.info("Orchestrator: Skipping image generation per user request.")
+            # Only generate if we don't already have one in the state (reuse mode)
+            if "image" not in self.state:
+                await self.execute_task("image", self._get_flattened_state())
+            else:
+                logger.info("Orchestrator: Skipping ImageAgent due to existing image reuse.")
 
-        # Layer 5: Improvement
-        await self.execute_task("seo", self.state)
-        await self.execute_task("readability", self.state)
-        await self.execute_task("originality", self.state)
-        
-        # Categorization & Social Tags
-        cat_result = await self.execute_task("category", self.state)
-        hash_result = await self.execute_task("hashtag", self.state)
-
-        # Layer 6: Governance
-        await self.execute_task("legal", self.state)
-        eval_result = await self.execute_task("evaluator", self.state)
-        
-        # PERSISTENCE: Save to DB as Post with Premium Metadata
-        from app.models.post import Post
-        final_draft = self.state.get("final_draft") or self.state.get("content_with_seo") or self.state.get("draft_content")
-        word_count = len(final_draft.split()) if final_draft else self.state.get("word_count", 0)
-        
-        # Grab SEO Agent Output
-        seo_extracted = self.state.get("seo_data", {})
-        focus_meta = seo_extracted.get("focus_keyword", self.state.get("topic"))
-        hashtags = seo_extracted.get("hashtags", [])
-        seo_score = seo_extracted.get("score", eval_result.data.get("score", 85))
-        
-        if final_draft:
-            new_post = Post(
-                title=[self.state.get("topic", "Untitled Article")],
-                content=[final_draft],
-                status="Draft",
-                word_count=word_count,
-                category=[self.state.get("category", "Intelligence")],
-                tags=self.state.get("tags", []),
-                seo_data={
-                    "focus_keyword": focus_meta,
-                    "hashtags": self.state.get("tags", hashtags),
-                    "word_count": word_count,
-                    "score": seo_score
-                },
-                research_sources=self.state.get("research_data", []),
-                meta=str(eval_result.data.get("critique", "Verification Passed"))
-            )
-            db.add(new_post)
-            try:
+        if task_id:
+            progress = db.query(TaskProgress).filter(TaskProgress.task_id == task_id).first()
+            if progress:
+                preview = dict(progress.preview_data or {})
+                voice_data = self.state.get("voice", {})
+                draft = voice_data.get("final_draft", "") if isinstance(voice_data, dict) else ""
+                preview["outline"] = "\n".join(str(draft).split("\n")[:3]) + "..."
+                progress.preview_data = preview
                 db.commit()
-                db.refresh(new_post)
-                logger.success(f"Orchestrator: Long-form article saved (ID: {new_post.id}, Words: {word_count})")
-                
-                # Mark entire task as completed
-                if task_id:
-                    from app.models.task_progress import TaskProgress
-                    progress = db.query(TaskProgress).filter(TaskProgress.task_id == task_id).first()
-                    if progress:
-                        preview = progress.preview_data or {}
-                        preview["seo_score"] = seo_score
-                        progress.preview_data = preview
-                        progress.status = "completed"
-                        db.commit()
 
-                self.state["final_publish_ready_content"] = {
-                    "id": new_post.id,
-                    "title": new_post.title[0],
-                    "content": new_post.content[0],
-                    "word_count": word_count
-                }
-            except Exception as e:
-                db.rollback()
-                logger.error(f"Orchestrator save error: {e}")
+        # --- Layer 5: Improvement (Parallel execution) ---
+        logger.info("Orchestrator: Executing Layer 5 Improvement Agents in Parallel")
+        current_context = self._get_flattened_state()
+        await asyncio.gather(
+            self.execute_task("seo", current_context),
+            self.execute_task("readability", current_context),
+            self.execute_task("originality", current_context)
+        )
+        
+        # Categorization & Social Tags (Parallel)
+        await asyncio.gather(
+            self.execute_task("category", current_context),
+            self.execute_task("hashtag", current_context)
+        )
 
-        return self.state.get("final_publish_ready_content")
+        # --- Layer 6: Governance ---
+        await self.execute_task("legal", self._get_flattened_state())
+        eval_result = await self.execute_task("evaluator", self._get_flattened_state())
+        
+        # --- PERSISTENCE ---
+        from app.models.post import Post
+        f_state = self._get_flattened_state()
+        final_draft = f_state.get("final_draft") or f_state.get("content_with_seo") or f_state.get("draft_content")
+        
+        if not final_draft:
+            logger.error("Orchestrator: Critical failure - no draft generated.")
+            return None
+
+        word_count = len(final_draft.split())
+        seo_data = f_state.get("seo_data", {})
+        
+        # Prepare Clean Telemetry for UI
+        telemetry = []
+        for entry in self.history:
+            agent_name = entry.get("agent")
+            output_data = entry.get("output", {}).get("data", {})
+            
+            # Extract confidence score from namespaced data
+            conf = output_data.get("confidence_score")
+            if conf is None:
+                # Fallback extraction from deep nesting
+                for val in output_data.values():
+                    if isinstance(val, dict) and "confidence_score" in val:
+                        conf = val["confidence_score"]
+                        break
+            
+            # Additional metrics if available
+            metrics = entry.get("output", {}).get("metrics", {})
+            
+            telemetry.append({
+                "agent_name": agent_name,
+                "status": entry.get("output", {}).get("status", "success"),
+                "confidence_score": conf or entry.get("output", {}).get("metrics", {}).get("confidence_score") or 0,
+                "start_time": None, 
+                "end_time": None,
+                "model_used": "Gemini 1.5 Pro"
+            })
+
+        image_crm_val = f_state.get("image_crm") or f_state.get("image", {}).get("image_crm", [])
+        if isinstance(image_crm_val, str):
+            image_crm_val = [image_crm_val]
+
+        new_post = Post(
+            title=[self.state["topic"]],
+            content=[final_draft],
+            status="Draft",
+            word_count=word_count,
+            category=[f_state.get("primary_category", "Intelligence")],
+            tags=f_state.get("tags", []),
+            image_crm=image_crm_val,
+            seo_data={
+                "focus_keyword": seo_data.get("focus_keyword", self.state["topic"]),
+                "hashtags": f_state.get("tags", []),
+                "score": seo_data.get("score", eval_result.data.get("score", 0)),
+                "readability_score": f_state.get("readability_score", 0)
+            },
+            research_sources=self.state.get("research_data", []),
+            agent_telemetry=telemetry,
+            meta=str(eval_result.data.get("critique", "Verification Passed"))
+        )
+        
+        db.add(new_post)
+        try:
+            db.commit()
+            db.refresh(new_post)
+            
+            if task_id:
+                progress = db.query(TaskProgress).filter(TaskProgress.task_id == task_id).first()
+                if progress:
+                    preview = dict(progress.preview_data or {})
+                    preview["seo_score"] = seo_data.get("score", 0)
+                    progress.preview_data = preview
+                    progress.status = "completed"
+                    db.commit()
+
+            return {
+                "id": new_post.id,
+                "title": new_post.title[0],
+                "word_count": word_count
+            }
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Orchestrator Save Error: {e}")
+            return None
+

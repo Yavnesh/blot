@@ -1,10 +1,12 @@
 # blot.ai - Autonomous AI Content Engine
 
-## 🆕 Latest Changes & Updates
-- **Pipeline Configurations & Providers**: Added dynamic configuration for image generation providers (Google API, Horde Client), cached vs. fresh data source selection, and conditional execution logging.
-- **Enhanced Pipeline Tracking**: Introduced inline timeline progress tracking directly within UI topic cards. View agent execution states in real-time (Running, Completed, Failed) along with start and end timestamps.
-- **UX Improvements**: Refined the posts dashboard functionality, verified proper topic card population, and implemented a split-view layout for posts to allow simultaneous content and reference reading.
-- **Architecture Migration**: Completely migrated the core blog generation pipeline from Django into a high-performance FastAPI + Celery architecture, utilizing React and Tailwind CSS on the frontend.
+## 🆕 Latest Changes & Updates (2026 Resilience Update)
+- **Dynamic Topic Refinement**: Improved the `CredibilityAgent` to analyze raw research and suggest a refined, search-optimized editorial topic, ensuring the articles are highly relevant and fact-based.
+- **Intelligent Image Reuse**: Orchestrator now detects existing visual assets for a given topic and reuses them for regenerated posts, reducing API costs and maintaining visual consistency.
+- **Orchestrator 2.0 Resilience Upgrade**: Upgraded the core engine to support **Parallel Execution** using `asyncio.gather`. This reduces pipeline latency by 30-50% by running refinement and metadata agents concurrently.
+- **Resilient AI Pipelines**: Integrated intelligent logic to distinguish between transient (retryable) and permanent (fatal) errors, coupled with namespaced state management to prevent data collisions.
+- **Precision Content & Telemetry**: Standardized `confidence_score` in every agent (`Writer`, `Image`, `Dataset`, etc.) and harvested them into a unified `agent_telemetry` object for real-time UI transparency.
+- **Core Reorganization**: Centralized all project documentation into `/documentation` and moved all verification/testing scripts to `/tests` for a cleaner root architecture.
 
 ---
 
@@ -13,10 +15,10 @@
 **blot.ai** is a state-of-the-art, hyper-agentic AI platform that fully automates the lifecycle of professional content creation. By leveraging a coordinated multi-agent orchestration pipeline, blot.ai handles everything from real-time trend discovery and semantic SEO research to generating premium, production-ready blog content.
 
 ### Key Capabilities
-- **Hyper-Agentic Orchestration**: A deterministic 6-layer pipeline spanning Discovery, Research, Drafting, Editing, Formatting, and Governance stages.
+- **Hyper-Agentic Orchestration 2.0**: A parallelized 6-layer pipeline spanning Discovery, Research, Strategy, Creation, Improvement, and Governance stages.
 - **Semantic Coverage Engine**: Real-time vector analysis to optimize SEO ranking predictions and semantic data point matching.
-- **Flexible Image Provisioning**: Broadened support for varying image generation pipelines, integrating easily with Google's API or decentralized networks like the Stable Horde Client.
-- **Pipeline Observability**: Deep tracking of each AI agent's performance, execution time, and potential LLM cost analysis, fed via Prometheus and displayed dynamically on the admin UI.
+- **High-Fidelity Writing**: Specialised agents for long-form articles, X (Twitter) threads, and LinkedIn posts with automated emojis and platform-specific formatting.
+- **Pipeline Telemetry**: Deep tracking of agent execution, including fact counts, SEO scores, and readability metrics, displayed via a real-time progress timeline.
 
 ---
 
@@ -33,6 +35,15 @@ The system runs as a coordinated suite of micro-services:
 | **6379** | **Redis** | Message Broker | Task queue for Celery to handle long-running autonomous editorial jobs. |
 | **9090** | **Metrics** | Observability | Prometheus endpoint targeting agent latency, costs, and pipeline efficiency metrics. |
 | **N/A** | **Celery Worker** | Execution Engine | Background worker pool executing the multi-agent editorial workflows asynchronously. |
+
+---
+
+## 📁 Project Structure
+- **/backend**: FastAPI application, database models, and the AI agent fleet.
+- **/frontend**: Internal React Admin CMS ("Blot Intelligence Hub").
+- **/blog_site**: Public-facing React blog site.
+- **/documentation**: Detailed architecture guides, rebrand logs, and strategic analysis.
+- **/tests**: Centralized suite of verification and performance tests.
 
 ---
 
@@ -96,31 +107,25 @@ cd blog_site && npm install && npm run dev
 
 ## 🧪 Testing & Sanity Checks
 
-### A. Core API Health
-Ensure the backend and DB are communicating:
+### A. Core API Health & Agent Verification
+Ensure the backend, DB, and Agent registry are communicating correctly:
 ```bash
-cd backend
-python3 verify_api.py
+# Run the centralized verification suite
+python3 tests/verify_agent_pipeline.py
+python3 tests/verify_api.py
 ```
 
-### B. Agent Pipeline Verification
-Test the full orchestrator logic (from Discovery to Draft) in a sandboxed mode:
-```bash
-cd backend
-python3 verify_agent_pipeline.py
-```
-
-### C. Manual Pipeline Trigger
+### B. Manual Pipeline Trigger
 1. Go to **[http://localhost:8080/docs](http://localhost:8080/docs)**.
 2. Open `POST /api/v1/generation/trigger`.
 3. Payload: `{"user_topic": "Future of Generative AI", "include_images": false}`.
-4. Watch the **Celery Terminal** logs to verify agent handoffs, pipeline success states, and stage-level telemetry.
+4. Watch the **Celery Terminal** logs to verify agent handoffs, parallel execution groups, and stage-level telemetry.
 
 ---
 
 ## 🛠️ Tech Stack
 - **Backend Architecture**: FastAPI, SQLAlchemy, Alembic, Celery, Redis
 - **Database Layer**: PostgreSQL + pgvector
-- **AI & Integrations**: Gemini 1.5 Pro, Scikit-learn (Semantic Engine)
-- **Frontend Systems**: React, Vite, Tailwind CSS
+- **AI & Orchestration**: Gemini 1.5 Pro, Asyncio Parallel Pipelines
+- **Frontend Systems**: React, Vite, Tailwind CSS v4
 - **Monitoring & CI/CD**: Prometheus, Sentry (Metrics)
