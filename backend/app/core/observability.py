@@ -40,5 +40,45 @@ def setup_observability(app):
     Main entry point for setting up observability in the FastAPI app.
     """
     setup_logging()
-    # If Sentry DSN is missing, we could add fallback logic here
-    logger.info("Observability setup complete")
+    
+    # 1. Prometheus Instrumentator (Automatic RED Metrics for FastAPI)
+    from prometheus_fastapi_instrumentator import Instrumentator
+    Instrumentator().instrument(app).expose(app)
+    
+    # 2. OpenTelemetry Initialization
+    import os
+    if os.getenv("ENABLE_TRACING", "false").lower() == "true":
+        from opentelemetry import trace
+        from opentelemetry.sdk.trace import TracerProvider
+        from opentelemetry.sdk.trace.export import BatchSpanProcessor
+        from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+        from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+        
+        # Configure Tracer
+        provider = TracerProvider()
+        
+        # Setup OTLP Exporter (sending traces to Jaeger or an OpenTelemetry Collector)
+        otlp_endpoint = os.getenv("OTLP_ENDPOINT", "http://localhost:4317")
+        processor = BatchSpanProcessor(OTLPSpanExporter(endpoint=otlp_endpoint, insecure=True))
+        provider.add_span_processor(processor)
+        trace.set_tracer_provider(provider)
+        
+        # Instrument FastAPI
+        FastAPIInstrumentor.instrument_app(app)
+        
+        # Optional: Instrument HTTPX and requests
+        try:
+            from opentelemetry.instrumentation.requests import RequestsInstrumentor
+            RequestsInstrumentor().instrument()
+        except ImportError:
+            pass
+            
+        try:
+            from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
+            HTTPXClientInstrumentor().instrument()
+        except ImportError:
+            pass
+            
+        logger.info(f"OpenTelemetry tracing enabled -> {otlp_endpoint}")
+
+    logger.info("Observability (Sentry / Prometheus / OTel) setup complete")

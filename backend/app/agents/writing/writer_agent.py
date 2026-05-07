@@ -15,7 +15,7 @@ class WriterAgent(BaseAgent):
             ]
         )
 
-    async def run(self, input_data: Dict[str, Any], context: Optional[Dict[str, Any]] = None) -> AgentOutput:
+    async def _execute(self, input_data: Dict[str, Any], context: Optional[Dict[str, Any]] = None) -> AgentOutput:
         topic = str(input_data.get("topic", ""))
         content_type = str(input_data.get("content_type", "blog")).lower()
         target_audience = str(input_data.get("target_audience", "General"))
@@ -43,7 +43,7 @@ class WriterAgent(BaseAgent):
         else:
             prompt = self._get_social_prompt(topic, content_type, primary_keyword, research_text, tone, target_audience)
 
-        response = genai_client.generate_response_single(prompt)
+        response = await genai_client.generate_response(prompt)
         content = genai_client.extract_pre_post_content(response)
 
         generated_wc = len(content.split())

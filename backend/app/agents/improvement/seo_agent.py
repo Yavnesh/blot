@@ -45,7 +45,7 @@ class SEOAgent(BaseAgent):
         clean = re.sub(r'-+', '-', clean) # remove consecutive hyphens
         return clean.strip('-')
 
-    async def run(self, input_data: Dict[str, Any], context: Optional[Dict[str, Any]] = None) -> AgentOutput:
+    async def _execute(self, input_data: Dict[str, Any], context: Optional[Dict[str, Any]] = None) -> AgentOutput:
         final_draft = input_data.get("final_draft") or input_data.get("content_with_seo")
         topic = input_data.get("topic", "N/A")
         primary_keyword = input_data.get("primary_keyword", topic)
@@ -99,29 +99,26 @@ Instructions & Constraints:
 5. Coverage Score: Base on how well the article covers the expected SERP sub-topics for '{primary_keyword}'. Look at the Heading Map to verify if topics are covered deeper in the article.
 """
 
-        response = genai_client.generate_structured(prompt, output_schema=SEOPackSchema)
-
-        if isinstance(response, genai_client.MockResponse):
-            parsed: Dict[str, Any] = json.loads(response.text)
-        else:
-            try:
-                parsed: Dict[str, Any] = json.loads(response.text)
-            except Exception as e:
-                logger.error(f"SEOAgent: Failed to parse JSON: {e}")
-                words = str(primary_keyword or topic).split()
-                parsed: Dict[str, Any] = {
-                    "focus_keyword": str(primary_keyword or topic),
-                    "title_variants": [str(topic)],
-                    "meta_description": f"Read our in-depth analysis of {topic}.",
-                    "url_slug": str(topic).lower().replace(" ", "-")[:60],
-                    "hashtags": [w.capitalize().replace("#", "") for w in words[:5]],
-                    "schema_type": "Article",
-                    "coverage_score": 75,
-                    "coverage_missing": [],
-                    "internal_link_suggestions": [],
-                    "image_alt_text_suggestion": str(topic),
-                    "score": 75
-                }
+        try:
+            response = await genai_client.generate_structured(prompt, output_schema=SEOPackSchema)
+            content = genai_client.extract_pre_post_content(response)
+            parsed: Dict[str, Any] = json.loads(content)
+        except Exception as e:
+            logger.error(f"SEOAgent: Failed to parse JSON: {e}")
+            words = str(primary_keyword or topic).split()
+            parsed: Dict[str, Any] = {
+                "focus_keyword": str(primary_keyword or topic),
+                "title_variants": [str(topic)],
+                "meta_description": f"Read our in-depth analysis of {topic}.",
+                "url_slug": str(topic).lower().replace(" ", "-")[:60],
+                "hashtags": [w.capitalize().replace("#", "") for w in words[:5]],
+                "schema_type": "Article",
+                "coverage_score": 75,
+                "coverage_missing": [],
+                "internal_link_suggestions": [],
+                "image_alt_text_suggestion": str(topic),
+                "score": 75
+            }
 
         # Validate & Enforce Rules
         

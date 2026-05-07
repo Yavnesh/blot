@@ -4,6 +4,7 @@ from datetime import datetime
 
 # Shared properties
 class PostBase(BaseModel):
+    org_id: Optional[int] = None
     post_id: Optional[str] = 'none'
     title: Optional[List[str]] = []
     meta: Optional[str] = 'none'

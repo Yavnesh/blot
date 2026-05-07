@@ -33,7 +33,7 @@ class IntentAgent(BaseAgent):
             ]
         )
 
-    async def run(self, input_data: Dict[str, Any], context: Optional[Dict[str, Any]] = None) -> AgentOutput:
+    async def _execute(self, input_data: Dict[str, Any], context: Optional[Dict[str, Any]] = None) -> AgentOutput:
         verified_research = input_data.get("verified_research", [])
         topic = str(input_data.get("topic", ""))
         target_audience = str(input_data.get("target_audience", "General"))
@@ -96,11 +96,9 @@ class IntentAgent(BaseAgent):
         """
         
         try:
-            response = genai_client.generate_structured(prompt, output_schema=BlueprintSchema)
-            if isinstance(response, genai_client.MockResponse):
-                blueprint_data = json.loads(response.text)
-            else:
-                blueprint_data = json.loads(str(response.text))
+            response = await genai_client.generate_structured(prompt, output_schema=BlueprintSchema)
+            content = genai_client.extract_pre_post_content(response)
+            blueprint_data = json.loads(content)
         except Exception as e:
             logger.error(f"IntentAgent: Failed to generate structured blueprint: {e}")
             return AgentOutput(data={}, status="error", feedback=str(e))

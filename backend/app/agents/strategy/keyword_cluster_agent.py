@@ -30,7 +30,7 @@ class KeywordClusterAgent(BaseAgent):
             ]
         )
 
-    async def run(self, input_data: Dict[str, Any], context: Optional[Dict[str, Any]] = None) -> AgentOutput:
+    async def _execute(self, input_data: Dict[str, Any], context: Optional[Dict[str, Any]] = None) -> AgentOutput:
         topic = str(input_data.get("topic", ""))
         verified_research = input_data.get("verified_research", [])
         fact_graph = input_data.get("fact_graph", {})
@@ -67,11 +67,9 @@ Produce a valid JSON object tracking the structure provided.
 """
 
         try:
-            response = genai_client.generate_structured(prompt, output_schema=ClusterSchema)
-            if isinstance(response, genai_client.MockResponse):
-                cluster_data = json.loads(response.text)
-            else:
-                cluster_data = json.loads(str(response.text))
+            response = await genai_client.generate_structured(prompt, output_schema=ClusterSchema)
+            content = genai_client.extract_pre_post_content(response)
+            cluster_data = json.loads(content)
         except Exception as e:
             logger.error(f"KeywordClusterAgent: Failed to generate structured JSON: {e}")
             # Safe fallback — build a minimal cluster manually

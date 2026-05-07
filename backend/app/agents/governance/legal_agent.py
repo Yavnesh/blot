@@ -29,7 +29,7 @@ class LegalAgent(BaseAgent):
             ]
         )
 
-    async def run(self, input_data: Dict[str, Any], context: Optional[Dict[str, Any]] = None) -> AgentOutput:
+    async def _execute(self, input_data: Dict[str, Any], context: Optional[Dict[str, Any]] = None) -> AgentOutput:
         content = input_data.get("original_content")
         category = input_data.get("category", "General")
         

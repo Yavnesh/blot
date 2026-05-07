@@ -39,7 +39,7 @@ class CategoryAgent(BaseAgent):
             ]
         )
 
-    async def run(self, input_data: Dict[str, Any], context: Optional[Dict[str, Any]] = None) -> AgentOutput:
+    async def _execute(self, input_data: Dict[str, Any], context: Optional[Dict[str, Any]] = None) -> AgentOutput:
         content = str(input_data.get("final_draft") or input_data.get("draft_content") or "")
         topic = str(input_data.get("topic", "article"))
 

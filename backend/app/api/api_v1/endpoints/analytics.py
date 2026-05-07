@@ -10,33 +10,38 @@ from app.models.post import Post
 from app.models.trending import Trending
 from app.models.scrape import Scrape
 from app.models.task_progress import TaskProgress
+from app.models.user import Organization
 
 router = APIRouter()
 
 @router.get("/summary", response_model=Dict[str, Any])
 def get_dashboard_analytics(
-    db: Session = Depends(deps.get_db)
+    db: Session = Depends(deps.get_db),
+    current_org: Organization = Depends(deps.get_current_active_org),
 ) -> Any:
     """
     Get aggregated analytics for the dashboard.
+    Requires authentication. Results are scoped to the user's active organization.
     """
     # 1. Pipeline Velocity (Last 30 days)
     today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
     start_date = today - timedelta(days=30)
     
     # Efficient daily grouping using SQL
-    def get_daily_counts(model):
+    def get_daily_counts(model, org_filter=None):
         query = db.query(
             func.date(model.created_at).label('date'),
             func.count(model.id).label('count')
-        ).filter(model.created_at >= start_date)\
-         .group_by(func.date(model.created_at))\
+        ).filter(model.created_at >= start_date)
+        if org_filter is not None:
+            query = query.filter(org_filter)
+        query = query.group_by(func.date(model.created_at))\
          .order_by(func.date(model.created_at)).all()
         return {str(row.date): row.count for row in query}
 
     topics_daily = get_daily_counts(Trending)
     scrapes_daily = {}  # Scrape model has no created_at field
-    posts_daily = get_daily_counts(Post)
+    posts_daily = get_daily_counts(Post, Post.org_id == current_org.id)
     
     # Fill gaps for the chart
     velocity = []
@@ -87,8 +92,8 @@ def get_dashboard_analytics(
             "total_runs": data["total"]
         })
 
-    # 3. Content SEO Distribution
-    posts = db.query(Post).all()
+    # 3. Content SEO Distribution — scoped to org
+    posts = db.query(Post).filter(Post.org_id == current_org.id).all()
     seo_dist = {"Excellent": 0, "Good": 0, "Average": 0, "Poor": 0}
     for p in posts:
         score = p.seo_data.get("score", 0) if p.seo_data else 0

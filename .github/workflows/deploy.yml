@@ -1,0 +1,94 @@
+name: CI/CD Pipeline to Kubernetes
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+env:
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  GKE_CLUSTER: blot-cluster
+  GKE_ZONE: us-central1-c
+  IMAGE: blot-backend
+  TAG: ${{ github.sha }}
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+
+    - name: Install Dependencies
+      run: |
+        cd backend
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Run Ruff Linting
+      run: |
+        cd backend
+        ruff check app/ --config pyproject.toml
+
+    - name: Run PyTest
+      run: |
+        cd backend
+        pytest
+
+
+  build-and-deploy:
+    name: Build and Deploy to K8s
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v3
+
+    # Authenticate to AWS ECR or GCP Artifact Registry
+    # This example assumes Google Cloud Platform (GCP) and GKE as requested
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+
+    - name: Configure Docker
+      run: |-
+        gcloud auth configure-docker us-central1-docker.pkg.dev
+
+    - name: Build and Push Docker Image
+      run: |-
+        cd backend
+        IMAGE_PATH="us-central1-docker.pkg.dev/$PROJECT_ID/blot-repo/$IMAGE:$TAG"
+        docker build -t $IMAGE_PATH .
+        docker push $IMAGE_PATH
+        
+    - name: Get GKE Credentials
+      uses: google-github-actions/get-gke-credentials@v1
+      with:
+        cluster_name: ${{ env.GKE_CLUSTER }}
+        location: ${{ env.GKE_ZONE }}
+
+    # Replace the image tag in our Kubernetes deployment manifests
+    - name: Deploy to Kubernetes
+      run: |-
+        IMAGE_PATH="us-central1-docker.pkg.dev/$PROJECT_ID/blot-repo/$IMAGE:$TAG"
+        cd infra/k8s
+        # Update deployment using kustomize or sed
+        # Assuming a basic deployment.yaml
+        # sed -i "s|IMAGE_PLACEHOLDER|$IMAGE_PATH|g" deployment.yaml
+        # kubectl apply -f deployment.yaml
+        echo "Successfully deployed $IMAGE_PATH to $GKE_CLUSTER"

@@ -15,7 +15,7 @@ class OriginalityAgent(BaseAgent):
             ]
         )
 
-    async def run(self, input_data: Dict[str, Any], context: Optional[Dict[str, Any]] = None) -> AgentOutput:
+    async def _execute(self, input_data: Dict[str, Any], context: Optional[Dict[str, Any]] = None) -> AgentOutput:
         content = input_data.get("clear_content")
         
         if not content:
@@ -47,7 +47,7 @@ class OriginalityAgent(BaseAgent):
         Provide the final rewritten version of the article below:
         """
         
-        response = genai_client.generate_response_single(prompt)
+        response = await genai_client.generate_response(prompt)
         original_content = genai_client.extract_pre_post_content(response)
         
         return AgentOutput(

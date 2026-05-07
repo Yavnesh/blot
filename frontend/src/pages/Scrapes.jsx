@@ -1,4 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Search, Globe, FileText, CheckCircle2, Shield, ArrowUpRight, X, Trash2, Cpu, Database } from 'lucide-react';
+import api from '../lib/axios';
 
 const Scrapes = () => {
     const [scrapes, setScrapes] = useState([]);
@@ -9,12 +12,8 @@ const Scrapes = () => {
     useEffect(() => {
         const fetchScrapes = async () => {
             try {
-                const response = await fetch('http://localhost:8080/api/v1/scrapes/');
-                if (!response.ok) {
-                    throw new Error('Failed to fetch scrapes');
-                }
-                const data = await response.json();
-                setScrapes(data);
+                const response = await api.get('/scrapes/');
+                setScrapes(response.data);
             } catch (err) {
                 setError(err.message);
             } finally {
@@ -25,135 +24,166 @@ const Scrapes = () => {
         fetchScrapes();
     }, []);
 
-    if (loading) return <div className="flex justify-center p-8"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div></div>;
-    if (error) return <div className="p-8 text-red-600 bg-red-50 rounded-lg m-4">Error: {error}</div>;
+    if (loading) return (
+        <div className="flex items-center justify-center min-h-[60vh]">
+            <div className="w-12 h-12 border-4 border-white/5 border-t-teal-500 rounded-full animate-spin" />
+        </div>
+    );
 
     return (
-        <div className="p-8 max-w-[1400px] mx-auto">
-            <div className="mb-12">
-                <h1 className="text-4xl font-black text-gray-900 mb-2 tracking-tight">Intelligence Repository</h1>
-                <p className="text-gray-400 font-bold uppercase tracking-[0.2em] text-[10px]">Library of Verified Research Nodes</p>
+        <div className="max-w-[1720px] mx-auto p-4 lg:p-0 space-y-12">
+            <header>
+                <h1 className="text-3xl font-black tracking-tighter text-white flex items-center gap-3">
+                    <Search className="text-teal-400 w-8 h-8" />
+                    Research <span className="text-teal-400">Engine</span>
+                </h1>
+                <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.3em] mt-3">
+                    Distributed Intelligence Gathering & Fact Verfication
+                </p>
+            </header>
+
+            <div className="glass-panel border border-white/5 bg-slate-900 overflow-hidden shadow-2xl">
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                        <thead>
+                            <tr className="bg-slate-950/40">
+                                <th className="px-10 py-6 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Data Origin</th>
+                                <th className="px-10 py-6 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Research Node</th>
+                                <th className="px-10 py-6 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Verification</th>
+                                <th className="px-10 py-6 text-right text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-white/5">
+                            {scrapes.map((scrape, i) => (
+                                <motion.tr 
+                                    initial={{ opacity: 0, x: -10 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    transition={{ delay: i * 0.03 }}
+                                    key={scrape.id} 
+                                    className="hover:bg-teal-400/[0.02] transition-colors group cursor-pointer"
+                                >
+                                    <td className="px-10 py-8">
+                                        <span className={`px-4 py-2 rounded-xl text-[8px] font-black uppercase tracking-widest border ${
+                                            scrape.trending_id && scrape.trending_id !== 'none' 
+                                            ? 'bg-teal-500/10 text-teal-400 border-teal-500/20' 
+                                            : 'bg-slate-950 text-slate-600 border-white/5'
+                                        }`}>
+                                            ID #{scrape.trending_id && scrape.trending_id !== 'none' ? scrape.trending_id : 'Global Hub'}
+                                        </span>
+                                    </td>
+                                    <td className="px-10 py-8">
+                                        <div className="max-w-md">
+                                            <p className="text-sm font-black text-white group-hover:text-teal-400 transition-colors truncate mb-1">
+                                                {scrape.url && scrape.url[0]}
+                                            </p>
+                                            <div className="flex items-center gap-3">
+                                                <span className="text-[9px] font-black text-slate-600 uppercase tracking-widest">{new Date(scrape.created_at).toLocaleDateString()}</span>
+                                                <div className="w-1 h-1 rounded-full bg-slate-800" />
+                                                <span className="text-[9px] font-black text-teal-400/60 uppercase tracking-widest">Web Ingestion Node</span>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td className="px-10 py-8">
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-10 h-10 rounded-xl bg-teal-500/10 border border-teal-500/20 text-teal-400 flex items-center justify-center">
+                                                <Shield size={18} />
+                                            </div>
+                                            <div>
+                                                <p className="text-[10px] font-black text-white uppercase tracking-tight">Verified Truth</p>
+                                                <p className="text-[8px] font-black text-teal-500 uppercase tracking-widest leading-none mt-1">Integrity Consensus Pass</p>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td className="px-10 py-8 text-right">
+                                        <div className="flex items-center justify-end gap-3">
+                                            <button
+                                                onClick={() => setSelectedData(scrape)}
+                                                className="h-12 px-6 bg-slate-950 text-white border border-white/5 rounded-2xl text-[9px] font-black uppercase tracking-widest hover:bg-teal-600 hover:border-teal-500 transition-all shadow-xl"
+                                            >
+                                                Inspect Vector
+                                            </button>
+                                            <button className="p-3 text-slate-600 hover:text-red-500 transition-all rounded-xl hover:bg-red-500/10">
+                                                <Trash2 size={18} />
+                                            </button>
+                                        </div>
+                                    </td>
+                                </motion.tr>
+                            ))}
+                        </tbody>
+                    </table>
+                    {scrapes.length === 0 && (
+                        <div className="text-center py-40">
+                             <Database size={64} className="text-slate-800 mx-auto mb-6 animate-pulse" />
+                             <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-600 italic">No intelligence ingested in active vault</p>
+                        </div>
+                    )}
+                </div>
             </div>
 
-            <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 overflow-hidden">
-                <table className="min-w-full divide-y divide-gray-50">
-                    <thead className="bg-gray-50/50">
-                        <tr>
-                            <th className="px-8 py-5 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Origin</th>
-                            <th className="px-8 py-5 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Research Node</th>
-                            <th className="px-8 py-5 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Verification</th>
-                            <th className="px-8 py-5 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-50">
-                        {scrapes.map((scrape) => (
-                            <tr key={scrape.id} className="hover:bg-indigo-50/30 transition-all duration-300 group">
-                                <td className="px-8 py-6 whitespace-nowrap">
-                                    <a
-                                        href={`/topics?id=${scrape.trending_id}`}
-                                        className="inline-flex items-center px-4 py-2 bg-white border border-gray-100 text-indigo-600 rounded-xl text-[10px] font-black shadow-sm group-hover:border-indigo-200 transition-all"
-                                    >
-                                        <i className="material-icons text-xs mr-2">tag</i> ID #{scrape.trending_id}
-                                    </a>
-                                </td>
-                                <td className="px-8 py-6">
-                                    <div className="max-w-md">
-                                        <a
-                                            href={scrape.url && scrape.url[0]}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="text-sm font-bold text-gray-900 truncate block hover:text-indigo-600 transition-colors"
-                                        >
-                                            {scrape.url && scrape.url[0]}
-                                        </a>
-                                        <div className="flex items-center gap-3 mt-1.5">
-                                            <span className="text-[9px] font-black text-gray-300 uppercase tracking-widest">{new Date(scrape.created_at || Date.now()).toLocaleDateString()}</span>
-                                            <span className="w-1 h-1 bg-gray-200 rounded-full"></span>
-                                            <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">Web Discovery</span>
+            <AnimatePresence>
+                {selectedData && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-end">
+                        <motion.div 
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => setSelectedData(null)}
+                            className="absolute inset-0 bg-slate-950/80 backdrop-blur-md"
+                        />
+                        <motion.div 
+                            initial={{ x: '100%' }}
+                            animate={{ x: 0 }}
+                            exit={{ x: '100%' }}
+                            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                            className="relative h-full w-full max-w-3xl bg-slate-900 border-l border-white/10 shadow-2xl flex flex-col p-12"
+                        >
+                            <div className="flex justify-between items-start mb-12">
+                                <div>
+                                    <div className="flex items-center gap-3 mb-3">
+                                        <div className="w-10 h-10 bg-teal-500/10 rounded-xl flex items-center justify-center text-teal-400">
+                                            <Cpu size={20} />
                                         </div>
+                                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Node Analysis Vector</span>
                                     </div>
-                                </td>
-                                <td className="px-8 py-6 whitespace-nowrap">
-                                    <div className="flex items-center gap-3">
-                                        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-emerald-50 border border-emerald-100 text-emerald-600">
-                                            <i className="material-icons text-sm">verified</i>
-                                        </div>
-                                        <div>
-                                            <p className="text-[10px] font-black text-gray-900 uppercase tracking-tight">Truth Verified</p>
-                                            <p className="text-[9px] font-bold text-emerald-500 uppercase tracking-widest">Integrity Pass</p>
-                                        </div>
+                                    <h2 className="text-3xl font-black text-white tracking-tighter max-w-lg mb-2 capitalize">
+                                        {selectedData.title && selectedData.title[0]}
+                                    </h2>
+                                    <p className="text-[10px] font-black text-teal-400 uppercase tracking-widest">Source: {selectedData.url && selectedData.url[0]}</p>
+                                </div>
+                                <button
+                                    onClick={() => setSelectedData(null)}
+                                    className="w-12 h-12 rounded-2xl bg-white/5 border border-white/5 flex items-center justify-center text-slate-400 hover:text-white hover:bg-red-500/20 hover:border-red-500/50 transition-all shadow-xl"
+                                >
+                                    <X size={20} />
+                                </button>
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto pr-4 custom-scrollbar space-y-10">
+                                <div className="p-8 bg-slate-950/50 border border-white/5 rounded-[2.5rem] shadow-inner">
+                                    <h4 className="text-[10px] font-black text-teal-400 uppercase tracking-widest mb-6 flex items-center gap-2">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-teal-500" />
+                                        Extracted Intelligence
+                                    </h4>
+                                    <div className="text-slate-300 font-bold leading-relaxed space-y-6">
+                                        {selectedData.content && selectedData.content[0]?.split('\n').filter(p => p.trim()).map((p, i) => (
+                                            <p key={i}>{p}</p>
+                                        ))}
                                     </div>
-                                </td>
-                                <td className="px-8 py-6 whitespace-nowrap text-right">
-                                    <div className="flex items-center justify-end gap-2">
-                                        <button
-                                            onClick={() => setSelectedData(scrape)}
-                                            className="px-5 py-2.5 bg-gray-900 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-black transition-all shadow-lg shadow-gray-200"
-                                        >
-                                            Inspect Node
-                                        </button>
-                                        <button className="p-2.5 text-gray-300 hover:text-red-500 transition-colors">
-                                            <i className="material-icons text-lg">delete_outline</i>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-                {scrapes.length === 0 && (
-                    <div className="text-center py-32 bg-gray-50/50">
-                        <i className="material-icons text-gray-200 text-6xl mb-6">dynamic_feed</i>
-                        <p className="text-gray-300 font-black uppercase tracking-[0.2em] italic">Awaiting Research Ingestion</p>
+                                </div>
+                            </div>
+
+                            <div className="mt-12">
+                                <button
+                                    onClick={() => setSelectedData(null)}
+                                    className="w-full h-18 bg-teal-600 hover:bg-teal-500 text-white text-[10px] font-black uppercase tracking-[0.3em] rounded-2xl transition-all shadow-2xl shadow-teal-500/20 active:scale-[0.98]"
+                                >
+                                    Relinquish Search Focus
+                                </button>
+                            </div>
+                        </motion.div>
                     </div>
                 )}
-            </div>
-
-            {/* View Data Modal */}
-            {selectedData && (
-                <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-end z-[100]">
-                    <div className="bg-white h-full w-full max-w-2xl shadow-2xl flex flex-col animate-slide-in-right">
-                        <div className="p-8 border-b border-gray-100 flex justify-between items-center">
-                            <div>
-                                <h1 className="text-2xl font-black text-gray-900 tracking-tight">Node Insight</h1>
-                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1">Source: {selectedData.url && selectedData.url[0]}</p>
-                            </div>
-                            <button
-                                onClick={() => setSelectedData(null)}
-                                className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-gray-400 hover:bg-red-50 hover:text-red-500 transition-all"
-                            >
-                                <i className="material-icons">close</i>
-                            </button>
-                        </div>
-                        <div className="flex-1 overflow-y-auto p-12 bg-[#FCFDFF]">
-                            <div className="max-w-prose mx-auto">
-                                <div className="mb-10 p-6 bg-white border border-gray-100 rounded-3xl shadow-sm">
-                                    <h4 className="text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-4">Discovery Context</h4>
-                                    <p className="text-sm text-gray-600 font-medium leading-relaxed">
-                                        {selectedData.title && selectedData.title[0]}
-                                    </p>
-                                </div>
-                                <div className="space-y-6">
-                                    <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Extracted Intelligence</h4>
-                                    <div className="bg-white border border-gray-100 rounded-3xl p-8 shadow-sm">
-                                        <p className="text-gray-700 leading-relaxed font-medium whitespace-pre-wrap">
-                                            {selectedData.content && selectedData.content[0]}
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="p-8 border-t border-gray-100 bg-white">
-                            <button
-                                onClick={() => setSelectedData(null)}
-                                className="w-full bg-gray-900 text-white font-black py-5 rounded-2xl hover:bg-black transition-all text-[11px] uppercase tracking-[0.2em] shadow-xl shadow-gray-200"
-                            >
-                                Finish Inspection
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            </AnimatePresence>
         </div>
     );
 };

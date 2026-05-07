@@ -29,6 +29,8 @@ pip-delete-this-directory.txt
 venv/
 ENV/
 .env
+backend/.env
+*.env.local
 
 # Javascript/Node
 node_modules/
@@ -71,3 +73,28 @@ tests/
 documentation/
 TEWS FULL DOCUMENTATION.pdf
 commit_message.txt
+project_files.txt
+start_dev.sh
+
+# Debugging & Scratch
+scratch/
+backend/scratch/
+debug_*.py
+backend/debug_*.py
+test_*.py
+backend/test_*.py
+populate_*.py
+backend/populate_*.py
+trigger_*.py
+backend/trigger_*.py
+reset_pass.py
+pipeline_auditor.py
+
+# Backups
+*_backup/
+backend/alembic/versions_backup/
+
+# Scripts
+scripts/*.py
+!scripts/__init__.py
+backend/scripts/*.py

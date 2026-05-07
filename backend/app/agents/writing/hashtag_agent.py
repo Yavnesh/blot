@@ -22,7 +22,7 @@ class HashtagAgent(BaseAgent):
             ]
         )
 
-    async def run(self, input_data: Dict[str, Any], context: Optional[Dict[str, Any]] = None) -> AgentOutput:
+    async def _execute(self, input_data: Dict[str, Any], context: Optional[Dict[str, Any]] = None) -> AgentOutput:
         content = input_data.get("final_draft") or input_data.get("draft_content") or ""
         topic = input_data.get("topic", "article")
         viral_tags_context = input_data.get("viral_tags", []) # Optional context from Aggregator

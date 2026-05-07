@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.api import deps
 from app.models.scrape import Scrape
 from app.schemas.scrape import ScrapeCreate, ScrapeUpdate, Scrape as ScrapeSchema
+from app.models.user import Organization
 
 router = APIRouter()
 
@@ -12,21 +13,23 @@ def read_scrapes(
     db: Session = Depends(deps.get_db),
     skip: int = 0,
     limit: int = 100,
+    current_org: Organization = Depends(deps.get_current_active_org)
 ) -> Any:
     """
-    Retrieve scrapes.
+    Retrieve scrapes. Requires authentication, scoped to org.
     """
-    scrapes = db.query(Scrape).offset(skip).limit(limit).all()
+    scrapes = db.query(Scrape).filter(Scrape.org_id == current_org.id).offset(skip).limit(limit).all()
     return scrapes
 
 @router.post("/", response_model=ScrapeSchema)
 def create_scrape(
     *,
     db: Session = Depends(deps.get_db),
+    current_org: Organization = Depends(deps.get_current_active_org),
     scrape_in: ScrapeCreate,
 ) -> Any:
     """
-    Create new scrape.
+    Create new scrape. Requires authentication.
     """
     scrape = Scrape(**scrape_in.model_dump())
     db.add(scrape)
@@ -38,10 +41,11 @@ def create_scrape(
 def read_scrape(
     *,
     db: Session = Depends(deps.get_db),
+    current_org: Organization = Depends(deps.get_current_active_org),
     scrape_id: int,
 ) -> Any:
     """
-    Get scrape by ID.
+    Get scrape by ID. Requires authentication.
     """
     scrape = db.query(Scrape).filter(Scrape.id == scrape_id).first()
     if not scrape:
@@ -52,11 +56,12 @@ def read_scrape(
 def update_scrape(
     *,
     db: Session = Depends(deps.get_db),
+    current_org: Organization = Depends(deps.get_current_active_org),
     scrape_id: int,
     scrape_in: ScrapeUpdate,
 ) -> Any:
     """
-    Update a scrape.
+    Update a scrape. Requires authentication.
     """
     scrape = db.query(Scrape).filter(Scrape.id == scrape_id).first()
     if not scrape:
@@ -73,10 +78,11 @@ def update_scrape(
 def delete_scrape(
     *,
     db: Session = Depends(deps.get_db),
+    current_org: Organization = Depends(deps.get_current_active_org),
     scrape_id: int,
 ) -> Any:
     """
-    Delete a scrape.
+    Delete a scrape. Requires authentication.
     """
     scrape = db.query(Scrape).filter(Scrape.id == scrape_id).first()
     if not scrape:

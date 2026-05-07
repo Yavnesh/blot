@@ -24,7 +24,7 @@ class EvaluationAgent(BaseAgent):
             ]
         )
 
-    async def run(self, input_data: Dict[str, Any], context: Optional[Dict[str, Any]] = None) -> AgentOutput:
+    async def _execute(self, input_data: Dict[str, Any], context: Optional[Dict[str, Any]] = None) -> AgentOutput:
         content = input_data.get("final_publish_ready_content")
         
         if not content:
@@ -50,18 +50,13 @@ class EvaluationAgent(BaseAgent):
         (If average score is < 85, provide mandatory improvements. Otherwise, provide minor suggestions.)
         """
         
-        response = genai_client.generate_structured(prompt, output_schema=EvaluationSchema)
-        
-        if isinstance(response, genai_client.MockResponse):
-            structured_data = json.loads(response.text)
         try:
+            response = await genai_client.generate_structured(prompt, output_schema=EvaluationSchema)
+            
             # First check if the response was blocked by safety filters
             if not hasattr(response, 'candidates') or not response.candidates:
                 # Prompt was likely blocked
-                if hasattr(response, 'prompt_feedback'):
-                    logger.error(f"EvaluationAgent: Content BLOCKED by safety filters. Reason: {response.prompt_feedback}")
-                else:
-                    logger.error("EvaluationAgent: Content blocked (no candidates found).")
+                logger.error("EvaluationAgent: Content blocked (no candidates found).")
                 
                 structured_data = {
                     "depth": 0,
@@ -69,11 +64,11 @@ class EvaluationAgent(BaseAgent):
                     "authority": 0,
                     "engagement": 0,
                     "average_score": 0.0,
-                    "instructions": f"Safety Block: The article content triggered Gemini safety filters. Block Reason: {getattr(response, 'prompt_feedback', 'Unknown')}"
+                    "instructions": "Safety Block: The content triggered Gemini safety filters."
                 }
             else:
-                # The structured format returns text containing valid JSON based on our schema
-                structured_data = json.loads(response.text)
+                content = genai_client.extract_pre_post_content(response)
+                structured_data = json.loads(content)
         except Exception as e:
             logger.error(f"Failed to parse structured response: {e}")
             structured_data = {

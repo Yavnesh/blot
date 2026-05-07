@@ -17,8 +17,9 @@ class TrendAgent(BaseAgent):
             ]
         )
 
-    async def run(self, input_data: Dict[str, Any], context: Dict[str, Any] = None) -> AgentOutput:
+    async def _execute(self, input_data: Dict[str, Any], context: Dict[str, Any] = None) -> AgentOutput:
         db: Session = input_data.get("db")
+
         if not db:
             return AgentOutput(data={}, status="error", feedback="Database session missing in input_data")
 
@@ -62,7 +63,7 @@ class TrendAgent(BaseAgent):
                     if score < 40:
                         continue
 
-                    analysis = self._analyze_topic_strategically(topic_name)
+                    analysis = await self._analyze_topic_strategically(topic_name)
                     
                     trending = Trending(
                         topic=topic_name,
@@ -120,7 +121,7 @@ class TrendAgent(BaseAgent):
         score = (norm_vol * 0.4) + (norm_growth * 0.3) + (norm_social * 0.2) + (norm_gap * 0.1)
         return int(score)
 
-    def _analyze_topic_strategically(self, topic: str) -> Dict[str, Any]:
+    async def _analyze_topic_strategically(self, topic: str) -> Dict[str, Any]:
         prompt = f"""
         Analyze the following trending topic for an editorial system:
         Topic: {topic}
@@ -130,6 +131,6 @@ class TrendAgent(BaseAgent):
         2. suggested_angle: Unique perspective.
         3. target_audience: Who cares?
         """
-        response = genai_client.generate_response_single(prompt)
+        response = await genai_client.generate_response(prompt)
         text = genai_client.extract_pre_post_content(response)
         return {"suggested_angle": text[:100], "full_analysis": text}

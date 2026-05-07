@@ -4,17 +4,19 @@ from sqlalchemy.orm import Session
 from app.api import deps
 from app.models.trending import Trending
 from app.schemas.trending import TrendingCreate, TrendingUpdate, Trending as TrendingSchema
+from app.models.user import User
 
 router = APIRouter()
 
 @router.get("/", response_model=List[TrendingSchema])
 def read_trendings(
     db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_active_user),
     skip: int = 0,
     limit: int = 100,
 ) -> Any:
     """
-    Retrieve trendings.
+    Retrieve trendings. Requires authentication.
     """
     trendings = db.query(Trending).order_by(Trending.created_at.desc()).offset(skip).limit(limit).all()
     return trendings
@@ -23,10 +25,11 @@ def read_trendings(
 def create_trending(
     *,
     db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_active_user),
     trending_in: TrendingCreate,
 ) -> Any:
     """
-    Create new trending topic.
+    Create new trending topic. Requires authentication.
     """
     trending = Trending(**trending_in.model_dump())
     db.add(trending)
@@ -38,10 +41,11 @@ def create_trending(
 def read_trending(
     *,
     db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_active_user),
     id: int,
 ) -> Any:
     """
-    Get trending topic by ID.
+    Get trending topic by ID. Requires authentication.
     """
     trending = db.query(Trending).filter(Trending.id == id).first()
     if not trending:
@@ -52,11 +56,12 @@ def read_trending(
 def update_trending(
     *,
     db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_active_user),
     id: int,
     trending_in: TrendingUpdate,
 ) -> Any:
     """
-    Update a trending topic.
+    Update a trending topic. Requires authentication.
     """
     trending = db.query(Trending).filter(Trending.id == id).first()
     if not trending:
@@ -73,10 +78,11 @@ def update_trending(
 def delete_trending(
     *,
     db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_active_user),
     id: int,
 ) -> Any:
     """
-    Delete a trending topic.
+    Delete a trending topic. Requires authentication.
     """
     trending = db.query(Trending).filter(Trending.id == id).first()
     if not trending:

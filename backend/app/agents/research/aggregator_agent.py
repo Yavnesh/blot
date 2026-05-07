@@ -49,6 +49,10 @@ class AggregatorAgent(BaseAgent):
             ]
         )
         self.tavily = TavilyClient(api_key=settings.TAVILY_API_KEY) if settings.TAVILY_API_KEY else None
+        if self.tavily:
+            logger.info("AggregatorAgent: Tavily Client initialized.")
+        else:
+            logger.warning("AggregatorAgent: Tavily API KEY MISSING in environment!")
 
     async def _check_tavily_credits(self) -> bool:
         """
@@ -133,10 +137,10 @@ class AggregatorAgent(BaseAgent):
                 lambda: self.tavily.search(
                     query=topic,
                     search_depth=search_depth,
-                    topic="news",  # AI-curated news filter
-                    days=7,        # Freshness filter
+                    # topic="news",  # Removing 'news' filter as it can be too restrictive
+                    days=7,        # Keep freshness filter
                     include_raw_content=True,
-                    max_results=5
+                    max_results=10
                 )
             )
             

@@ -15,7 +15,7 @@ class ReadabilityAgent(BaseAgent):
             ]
         )
 
-    async def run(self, input_data: Dict[str, Any], context: Optional[Dict[str, Any]] = None) -> AgentOutput:
+    async def _execute(self, input_data: Dict[str, Any], context: Optional[Dict[str, Any]] = None) -> AgentOutput:
         content = input_data.get("final_draft")
         
         if not content:
@@ -40,7 +40,7 @@ class ReadabilityAgent(BaseAgent):
         # Calculate Deterministic Readability BEFORE
         score_before = textstat.flesch_reading_ease(content)
         
-        response = genai_client.generate_response_single(prompt)
+        response = await genai_client.generate_response(prompt)
         clear_content = genai_client.extract_pre_post_content(response)
         
         # Calculate Deterministic Readability AFTER

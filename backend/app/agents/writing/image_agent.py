@@ -15,7 +15,7 @@ class ImageAgent(BaseAgent):
             ]
         )
 
-    async def run(self, input_data: Dict[str, Any], context: Dict[str, Any] = None) -> AgentOutput:
+    async def _execute(self, input_data: Dict[str, Any], context: Dict[str, Any] = None) -> AgentOutput:
         content = input_data.get("final_draft") or input_data.get("draft_content")
         post_id = input_data.get("post_id", 0)
         topic = input_data.get("topic", "article")

@@ -2,13 +2,16 @@ from typing import Dict, Any, List, Optional
 from loguru import logger
 from app.agents.core.base_agent import BaseAgent, AgentOutput
 from app.core.clients import genai_client
+from app.db.session import SessionLocal
+from app.models.correction import CorrectionLog
+from sqlalchemy import desc
 
 class VoiceAgent(BaseAgent):
     def __init__(self):
         super().__init__(
             role="Voice Personalization Agent",
             rules=[
-                "Apply the Tews brand tone (Authoritative, Insightful, and Human-centric).",
+                "Apply the Blot brand tone (Authoritative, Insightful, and Human-centric).",
                 "Enforce negative constraints to eliminate 'AI-isms'.",
                 "Inject sentence variability (burstiness) for a more human rhythm.",
                 "Mandate active voice and remove passive constructions.",
@@ -16,20 +19,76 @@ class VoiceAgent(BaseAgent):
             ]
         )
 
-    async def run(self, input_data: Dict[str, Any], context: Optional[Dict[str, Any]] = None) -> AgentOutput:
+    def _get_past_corrections(self, org_id: int, limit: int = 3) -> str:
+        """
+        Retrieves recent human edits to provide few-shot style alignment to the LLM.
+        This closes the 'Data Flywheel' loop.
+        """
+        if not org_id:
+            return ""
+            
+        try:
+            db = SessionLocal()
+            corrections = db.query(CorrectionLog).filter(
+                CorrectionLog.org_id == org_id
+            ).order_by(desc(CorrectionLog.created_at)).limit(limit).all()
+            db.close()
+            
+            if not corrections:
+                return ""
+            
+            context_blocks = []
+            for i, c in enumerate(corrections):
+                context_blocks.append(
+                    f"Example {i+1}:\n"
+                    f"[Original AI Output]:\n{c.original_ai_draft[:500]}...\n"
+                    f"[Human Correction]:\n{c.human_edited_draft[:500]}...\n"
+                )
+            
+            return "\n".join(context_blocks)
+        except Exception as e:
+            logger.error(f"Flywheel error fetching corrections: {e}")
+            return ""
+
+    async def _execute(self, input_data: Dict[str, Any], context: Optional[Dict[str, Any]] = None) -> AgentOutput:
         draft_content = input_data.get("draft_content")
         brand_rules = input_data.get("brand_rules", "Authoritative, Insightful, and Human-centric.")
+        org_id = input_data.get("org_id")
         
         if not draft_content:
             return AgentOutput(data={}, status="error", feedback="No draft content to personalize")
 
-        logger.info("VoiceAgent: Hardening brand tone and removing AI bias.")
+        logger.info(f"VoiceAgent: Hardening brand tone for Org {org_id}")
+
+        # Fetch Personalization context
+        personalization = input_data.get("personalization", {})
+        if personalization.get("enabled", True):
+            cp = personalization.get("company_profile", {})
+            brand_rules = f"""
+            Voice: {cp.get('brand_voice')}
+            Tone: {cp.get('brand_tone')}
+            Industry Context: {cp.get('industry')}
+            Target Audience: {cp.get('target_audience')}
+            Key Messages to Reflect: {cp.get('key_messages')}
+            """
         
+        # Data Flywheel: Fetch few-shot learning context
+        learning_context = self._get_past_corrections(org_id)
+        flywheel_instruction = ""
+        if learning_context:
+            flywheel_instruction = (
+                "\nSTRICT STYLE ALIGNMENT (DATA FLYWHEEL):\n"
+                "The following examples show how humans have corrected your previous drafts for this specific brand. "
+                "Study the differences and apply the same editorial logic to the new draft:\n"
+                f"{learning_context}\n"
+            )
+
         prompt = f"""
         You are an elite editorial director. Your task is to polish the following article draft to perfectly match our brand voice.
         
         BRAND VOICE GOALS:
         {brand_rules}
+        {flywheel_instruction}
         
         POLISHING RULES:
         1. BANNED WORDS/IDEAS: Do NOT use these cliché AI-isms: 'tapestry', 'delve', 'pivotal', 'landscape', 'unveiling', 'comprehensive guide', 'paving the way', or 'in conclusion'. 
@@ -46,7 +105,7 @@ class VoiceAgent(BaseAgent):
         Refine the prose now:
         """
         
-        response = genai_client.generate_response_single(prompt)
+        response = await genai_client.generate_response(prompt)
         personalized_content = genai_client.extract_pre_post_content(response)
         
         return AgentOutput(
@@ -57,4 +116,5 @@ class VoiceAgent(BaseAgent):
             prompt=prompt,
             status="success"
         )
+
 

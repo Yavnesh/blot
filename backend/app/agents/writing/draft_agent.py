@@ -35,7 +35,7 @@ class DraftAgent(BaseAgent):
         # Regex to find [Label](URL)
         return re.sub(r'\[([^\]]+)\]\((https?://[^\)]+)\)', replace_link, text)
 
-    async def run(self, input_data: Dict[str, Any], context: Optional[Dict[str, Any]] = None) -> AgentOutput:
+    async def _execute(self, input_data: Dict[str, Any], context: Optional[Dict[str, Any]] = None) -> AgentOutput:
         verified_research = input_data.get("verified_research", [])
         serp_blueprint = input_data.get("serp_blueprint")
         if not serp_blueprint and input_data.get("strategy_doc"):
@@ -52,7 +52,19 @@ class DraftAgent(BaseAgent):
         if not verified_research or not serp_blueprint:
             return AgentOutput(data={}, status="error", feedback="Missing research or strategy blueprint")
 
+        # 1. Extract Headings from Blueprint
+        headings: List[Dict[str, Any]] = []
+        if isinstance(serp_blueprint, dict):
+            hd = serp_blueprint.get("heading_skeleton", [])
+            headings = list(hd) if isinstance(hd, list) else []
+            
+        if not headings:
+            # Emergency fallback if skeleton is missing
+            headings = [{"level": "H2", "text": "Introduction", "intent_and_entities": "Set the stage"}]
+
         logger.info(f"DraftAgent: Beginning Section-by-Section drafting for '{topic}'")
+        logger.info(f"Research items received: {len(verified_research)}")
+        logger.info(f"Blueprint headings: {len(headings)}")
 
         # 1. Prepare Research Context (Limited per section to avoid context squeeze)
         research_context_list = []
@@ -62,20 +74,13 @@ class DraftAgent(BaseAgent):
             if isinstance(r, dict):
                 title_val = str(r.get('title', 'N/A'))
                 url_val = str(r.get('url', 'N/A'))
-                txt_val = str(r.get('text', ''))
+                txt_val = str(r.get('text', r.get('snippet', '')))
+                src_type = str(r.get('source', 'EXTERNAL'))
                 txt_snippet = txt_val[:2000]
-                research_context_list.append(f"Source: {title_val}\nURL: {url_val}\nContent: {txt_snippet}")
+                research_context_list.append(f"Source: {title_val} ({src_type})\nURL: {url_val}\nContent: {txt_snippet}")
         research_context = "\n\n".join(research_context_list)
 
-        # 2. Extract Headings from Blueprint
-        headings: List[Dict[str, Any]] = []
-        if isinstance(serp_blueprint, dict):
-            hd = serp_blueprint.get("heading_skeleton", [])
-            headings = list(hd) if isinstance(hd, list) else []
-            
-        if not headings:
-            # Emergency fallback if skeleton is missing
-            headings = [{"level": "H2", "text": "Introduction", "intent_and_entities": "Set the stage"}]
+        # 2. Prepare Research Context (Limited per section to avoid context squeeze)
 
         final_article_sections = []
         
@@ -107,11 +112,41 @@ class DraftAgent(BaseAgent):
             4. Integration: Naturally integrate the primary keyword and any entities mentioned in the section goal.
             5. Formatting: Use bullet points or short sub-lists if it helps clarity.
             6. NO INTRODUCTORY FILLER: Start writing the content immediately. Do NOT include any sentences like 'Sure, here is the section' or 'I have drafted the content'. 
+            7. INTERNAL AUTHORITY: If a source is labeled 'INTERNAL_AUTHORITY', treat its facts and terminology as the primary source of truth, overriding external web data where conflicting.
             
             Output ONLY the section content (including the {h_level} header).
             """
             
-            section_response = genai_client.generate_response_single(section_prompt)
+            # 4. Integrate Personalization if enabled
+            personalization = input_data.get("personalization", {})
+            if personalization.get("enabled", True):
+                cp = personalization.get("company_profile", {})
+                up = personalization.get("user_profile", {})
+                
+                personalization_context = f"""
+                
+                --- STRICT BRAND ALIGNMENT (STEP 3 RULES) ---
+                Representing Company: {cp.get('company_name')}
+                Industry: {cp.get('industry')}
+                Description: {cp.get('description')}
+                Target Audience: {cp.get('target_audience')}
+                USP & Differentiators: {cp.get('usp')}
+                Core Offerings: {cp.get('products_services')}
+                Brand Voice: {cp.get('brand_voice')}
+                Brand Tone: {cp.get('brand_tone')}
+                Key Messages: {cp.get('key_messages')}
+                
+                INSTRUCTIONS:
+                - Write AS if you are the company's expert. Use "we" or an authoritative brand voice.
+                - Reflect {cp.get('brand_voice')} voice and {cp.get('brand_tone')} tone consistently.
+                - Naturally integrate core offerings: {cp.get('products_services')}.
+                - Subtly reinforce the USP: {cp.get('usp')}.
+                - Address target audience pain points relevant to {cp.get('industry')}.
+                - Avoid sounding generic. Every paragraph should feel like it belongs on {cp.get('company_name')}'s blog.
+                """
+                section_prompt = section_prompt.replace("SECTION GOAL:", f"PERSONALIZATION CONTEXT:\n{personalization_context}\n\nSECTION GOAL:")
+            
+            section_response = await genai_client.generate_response(section_prompt)
             section_text = genai_client.extract_pre_post_content(section_response)
             final_article_sections.append(section_text)
 

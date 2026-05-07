@@ -1,0 +1,45 @@
+[project]
+name = "blot-backend"
+version = "0.1.0"
+description = "Blot.ai — AI-powered content intelligence platform"
+requires-python = ">=3.11"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+src = ["app"]
+
+[tool.ruff.lint]
+# Start conservative — catch real bugs without drowning in style noise
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes (unused imports, undefined names)
+    "I",    # isort (import ordering)
+    "B",    # flake8-bugbear (common anti-patterns)
+    "UP",   # pyupgrade (Python 3.11+ syntax)
+    "S",    # flake8-bandit (security checks)
+    "T20",  # flake8-print (no print statements in prod)
+    "SIM",  # flake8-simplify
+    "RUF",  # Ruff-specific rules
+]
+ignore = [
+    "E501",   # line too long — handled by formatter
+    "S101",   # assert usage — fine in non-prod code
+    "S104",   # binding to all interfaces — intentional in Docker
+    "B008",   # function calls in defaults — FastAPI Depends() pattern
+    "UP007",  # X | Y union syntax — keep Optional[] for now
+    "RUF012", # mutable class attrs — SQLAlchemy models use them
+    "T201",   # print() — allow for now, tighten later
+]
+
+[tool.ruff.lint.per-file-ignores]
+"alembic/*" = ["E", "F", "I"]          # Migration files are auto-generated
+"app/tests/*" = ["S101", "S106"]        # Allow assert and hardcoded passwords in tests
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"

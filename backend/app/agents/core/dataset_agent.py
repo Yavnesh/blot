@@ -15,7 +15,7 @@ class DatasetAgent(BaseAgent):
             ]
         )
 
-    async def run(self, input_data: Dict[str, Any], context: Dict[str, Any] = None) -> AgentOutput:
+    async def _execute(self, input_data: Dict[str, Any], context: Dict[str, Any] = None) -> AgentOutput:
         db: Session = input_data.get("db")
         history: List[Dict[str, Any]] = input_data.get("history", [])
         score: float = input_data.get("score", 0.0)

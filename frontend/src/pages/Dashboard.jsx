@@ -1,5 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
     Activity,
     Zap,
@@ -22,6 +22,9 @@ import {
     ArrowUpRight,
     Play
 } from 'lucide-react';
+import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
+import { Input } from '../components/ui/Input';
+import { Button } from '../components/ui/Button';
 import {
     AreaChart,
     Area,
@@ -40,20 +43,31 @@ import {
     Legend
 } from 'recharts';
 
-const API_BASE = 'http://localhost:8080/api/v1';
+import api from '../lib/axios';
+import { useOrchestratorStore } from '../store/orchestratorStore';
+import { useAuthStore } from '../store/authStore';
+import OnboardingModal from '../components/OnboardingModal';
 
 const Dashboard = () => {
+    const { selectedAssetIds } = useOrchestratorStore();
     const [analytics, setAnalytics] = useState(null);
     const [loading, setLoading] = useState(true);
     const [topicInput, setTopicInput] = useState('');
     const [contentType, setContentType] = useState('blog');
     const [isTriggering, setIsTriggering] = useState(false);
+    const { user } = useAuthStore();
+    const [showOnboarding, setShowOnboarding] = useState(false);
+
+    useEffect(() => {
+        if (user && !user.onboarding_completed) {
+            setShowOnboarding(true);
+        }
+    }, [user]);
 
     const fetchAnalytics = async () => {
         try {
-            const res = await fetch(`${API_BASE}/analytics/summary`);
-            const data = await res.json();
-            setAnalytics(data);
+            const res = await api.get('/analytics/summary');
+            setAnalytics(res.data);
         } catch (error) {
             console.error("Dashboard error:", error);
         } finally {
@@ -72,10 +86,12 @@ const Dashboard = () => {
         if (!topicInput.trim()) return;
         setIsTriggering(true);
         try {
-            await fetch(`${API_BASE}/generation/trigger`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ user_topic: topicInput.trim(), include_images: true, content_type: contentType })
+            await api.post('/generation/trigger', { 
+                user_topic: topicInput.trim(), 
+                include_images: true, 
+                content_type: contentType,
+                context_document_ids: selectedAssetIds,
+                research_mode: selectedAssetIds.length > 0 ? 'hybrid' : 'web'
             });
             setTopicInput('');
             fetchAnalytics();
@@ -87,347 +103,299 @@ const Dashboard = () => {
     };
 
     if (loading) return (
-        <div className="flex items-center justify-center min-h-screen bg-[#f8f9fc]">
+        <div className="flex items-center justify-center min-h-[60vh]">
             <div className="flex flex-col items-center gap-4">
-                <div className="w-12 h-12 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin"></div>
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Loading Intelligence...</p>
+                <div className="w-12 h-12 border-4 border-white/5 border-t-teal-500 rounded-full animate-spin"></div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Syncing Intelligence Matrix...</p>
             </div>
         </div>
     );
 
-    const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444'];
+    const COLORS = ['#14b8a6', '#f59e0b', '#6366f1', '#ef4444'];
 
     return (
-        <div className="bg-[#f8f9fc] min-h-screen p-8 pt-6 font-sans text-slate-900 pb-20">
-            {/* Top Navigation */}
-            <div className="max-w-[1680px] mx-auto mb-8 flex items-center justify-between">
-                <div>
-                    <h1 className="text-3xl font-black tracking-tight text-slate-900 flex items-center gap-3">
-                        <BrainCircuit className="text-indigo-600 w-8 h-8" />
-                        Blot Intelligence <span className="text-indigo-600">Hub</span>
+        <div className="max-w-[1720px] mx-auto p-4 lg:p-0 space-y-12 pb-24">
+            <OnboardingModal isOpen={showOnboarding} onClose={() => setShowOnboarding(false)} />
+            {/* Perspective HUD */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <motion.div 
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                >
+                    <h1 className="text-3xl font-black tracking-tighter text-white flex items-center gap-3">
+                        <BrainCircuit className="text-teal-400 w-8 h-8" />
+                        Intelligence <span className="text-teal-400">Ledger</span>
                     </h1>
-                    <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mt-1">Blot OS • Autonomous Pipeline Management • v4.0.0-PRO</p>
-                </div>
-                <div className="flex items-center gap-4">
-                    <div className="bg-white px-5 py-3 rounded-2xl border border-slate-200 flex items-center gap-4 shadow-sm">
-                        <span className="text-[10px] font-black uppercase text-slate-400">Network Reach</span>
-                        <div className="flex -space-x-2">
-                            {[1, 2, 3, 4].map(i => (
-                                <div key={i} className="w-6 h-6 rounded-full border-2 border-white bg-slate-100 flex items-center justify-center overflow-hidden">
-                                    <Globe2 className="w-3 h-3 text-slate-400" />
+                    <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.3em] mt-3 flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-teal-500 animate-pulse shadow-[0_0_8px_rgba(20,184,166,0.5)]"></span>
+                        Blot OS v4.0.0-PRO • Autonomous Swarm Monitor
+                    </p>
+                </motion.div>
+                
+                <motion.div 
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    className="flex items-center gap-4"
+                >
+                    <div className="glass-panel px-6 py-4 flex items-center gap-8 border border-white/5 bg-slate-900/40">
+                        <div className="flex flex-col">
+                            <span className="text-[8px] font-black uppercase text-slate-500 tracking-[0.2em] mb-1">Global Entity Reach</span>
+                            <span className="text-sm font-black text-white">12.4M Verified Nodes</span>
+                        </div>
+                        <div className="h-10 w-[1px] bg-white/5" />
+                        <div className="flex -space-x-3">
+                            {[1, 2, 3, 4, 5].map(i => (
+                                <div key={i} className="w-9 h-9 rounded-xl border-2 border-slate-950 bg-slate-800 flex items-center justify-center ring-1 ring-white/10 group hover:z-10 transition-all cursor-pointer overflow-hidden transform hover:-translate-y-1">
+                                     <Globe2 className="w-4 h-4 text-slate-500 group-hover:text-teal-400" />
                                 </div>
                             ))}
                         </div>
                     </div>
-                    <button className="bg-indigo-600 text-white p-3 rounded-2xl shadow-xl shadow-indigo-200 hover:bg-indigo-700 transition-all active:scale-95">
-                        <Zap className="w-5 h-5" />
-                    </button>
-                </div>
+                </motion.div>
             </div>
 
-            <div className="max-w-[1680px] mx-auto space-y-8">
+            {/* Performance Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <StatCard
+                    title="Discovery Cycles"
+                    value={analytics?.totals?.topics || 0}
+                    change="+12.4%"
+                    icon={<Activity className="w-4 h-4 text-teal-400" />}
+                    data={analytics?.velocity?.map(v => ({ v: v.topics }))}
+                    color="#14b8a6"
+                    delay={0.1}
+                />
+                <StatCard
+                    title="Knowledge Extraction"
+                    value={analytics?.totals?.scrapes || 0}
+                    change="+8.2%"
+                    icon={<Database className="w-4 h-4 text-amber-500" />}
+                    data={analytics?.velocity?.map(v => ({ v: v.scrapes }))}
+                    color="#f59e0b"
+                    delay={0.2}
+                />
+                <StatCard
+                    title="Generated Assets"
+                    value={analytics?.totals?.posts || 0}
+                    change="+24.1%"
+                    icon={<FileText className="w-4 h-4 text-indigo-400" />}
+                    data={analytics?.velocity?.map(v => ({ v: v.posts }))}
+                    color="#6366f1"
+                    delay={0.3}
+                />
+                <StatCard
+                    title="System Purity"
+                    value="98.2%"
+                    change="+0.4%"
+                    icon={<Terminal className="w-4 h-4 text-slate-400" />}
+                    data={analytics?.velocity?.map(v => ({ v: 90 + Math.random() * 8 }))}
+                    color="#94a3b8"
+                    delay={0.4}
+                />
+            </div>
 
-                {/* Stats Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    <StatCard
-                        title="Discovery Nodes"
-                        value={analytics?.totals?.topics || 0}
-                        change="+14.2%"
-                        icon={<Activity className="w-5 h-5" />}
-                        color="indigo"
-                        data={analytics?.velocity?.map(v => ({ v: v.topics }))}
-                    />
-                    <StatCard
-                        title="Knowledge Scrapes"
-                        value={analytics?.totals?.scrapes || 0}
-                        change="+8.2%"
-                        icon={<Database className="w-5 h-5" />}
-                        color="emerald"
-                        data={analytics?.velocity?.map(v => ({ v: v.scrapes }))}
-                    />
-                    <StatCard
-                        title="Published Posts"
-                        value={analytics?.totals?.posts || 0}
-                        change="+24.1%"
-                        icon={<FileText className="w-5 h-5" />}
-                        color="amber"
-                        data={analytics?.velocity?.map(v => ({ v: v.posts }))}
-                    />
-                    <StatCard
-                        title="System Efficiency"
-                        value="98.4%"
-                        change="+0.4%"
-                        icon={<Terminal className="w-5 h-5" />}
-                        color="slate"
-                        data={analytics?.velocity?.map(v => ({ v: 90 + Math.random() * 8 }))}
-                    />
-                </div>
-
-                {/* Main Middle Layout */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-
-                    {/* Velocity Chart Block */}
-                    <div className="lg:col-span-8 bg-white rounded-[2.5rem] p-10 border border-slate-200 shadow-sm">
-                        <div className="flex items-center justify-between mb-10">
-                            <div>
-                                <h3 className="text-xl font-black text-slate-900 tracking-tight">Pipeline Throughput</h3>
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Cross-reference orchestration latency by node</p>
-                            </div>
-                            <div className="flex gap-4">
-                                <div className="flex items-center gap-2">
-                                    <div className="w-3 h-3 rounded-full bg-indigo-500"></div>
-                                    <span className="text-[10px] font-black uppercase text-slate-400">Trend Discovery</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
-                                    <span className="text-[10px] font-black uppercase text-slate-400">Knowledge Research</span>
-                                </div>
-                            </div>
+            {/* Content & Control Matrix */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                {/* Orchestration Stream */}
+                <motion.div 
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.5 }}
+                    className="lg:col-span-8 glass-panel p-10 border border-white/5 shadow-2xl overflow-hidden relative group min-h-[500px]"
+                >
+                    <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity pointer-events-none">
+                        <TrendingUp size={240} />
+                    </div>
+                    <div className="flex items-center justify-between mb-12 relative z-10">
+                        <div>
+                            <h3 className="text-xl font-black text-white tracking-widest uppercase italic">Orchestration Throughput</h3>
+                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mt-3 flex items-center gap-2">
+                                <span className="w-1.5 h-1.5 rounded-full bg-teal-500/50" />
+                                Multi-Agent Latency Analysis • Real-time
+                            </p>
                         </div>
-                        <div className="h-[420px]">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <AreaChart data={analytics?.velocity || []}>
-                                    <defs>
-                                        <linearGradient id="gIndigo" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#6366f1" stopOpacity={0.15} />
-                                            <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
-                                        </linearGradient>
-                                        <linearGradient id="gEmerald" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#10b981" stopOpacity={0.15} />
-                                            <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                                        </linearGradient>
-                                    </defs>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 700 }} dy={15} />
-                                    <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 700 }} />
-                                    <Tooltip contentStyle={{ borderRadius: '2rem', border: 'none', boxShadow: '0 25px 50px -12px rgb(0 0 0 / 0.15)', padding: '1.5rem' }} />
-                                    <Area type="monotone" dataKey="topics" stroke="#6366f1" strokeWidth={4} fillOpacity={1} fill="url(#gIndigo)" />
-                                    <Area type="monotone" dataKey="scrapes" stroke="#10b981" strokeWidth={4} fillOpacity={1} fill="url(#gEmerald)" />
-                                </AreaChart>
-                            </ResponsiveContainer>
+                        <div className="flex gap-8">
+                            <div className="flex items-center gap-3">
+                                <div className="w-2 h-2 rounded-full bg-teal-500 shadow-[0_0_8px_rgba(20,184,166,0.6)]"></div>
+                                <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Discovery</span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <div className="w-2 h-2 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.6)]"></div>
+                                <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Research</span>
+                            </div>
                         </div>
                     </div>
+                    <div className="h-[380px] relative z-10">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart data={analytics?.velocity || []}>
+                                <defs>
+                                    <linearGradient id="gTeal" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#14b8a6" stopOpacity={0.2} />
+                                        <stop offset="95%" stopColor="#14b8a6" stopOpacity={0} />
+                                    </linearGradient>
+                                    <linearGradient id="gAmber" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.2} />
+                                        <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
+                                    </linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#ffffff08" />
+                                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#475569', fontSize: 10, fontWeight: 900 }} dy={15} />
+                                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#475569', fontSize: 10, fontWeight: 900 }} />
+                                <Tooltip 
+                                    contentStyle={{ backgroundColor: '#0f172a', borderRadius: '1.5rem', border: '1px solid rgba(255,255,255,0.05)', boxShadow: '0 25px 50px -12px rgb(0 0 0 / 0.5)', padding: '1.5rem' }} 
+                                    itemStyle={{ color: '#fff' }}
+                                />
+                                <Area type="monotone" dataKey="topics" stroke="#14b8a6" strokeWidth={5} fillOpacity={1} fill="url(#gTeal)" />
+                                <Area type="monotone" dataKey="scrapes" stroke="#f59e0b" strokeWidth={5} fillOpacity={1} fill="url(#gAmber)" />
+                            </AreaChart>
+                        </ResponsiveContainer>
+                    </div>
+                </motion.div>
 
-                    {/* Right-side Quick Insight Column */}
-                    <div className="lg:col-span-4 space-y-8">
-                        {/* Interactive Engagement Card */}
-                        <div className="bg-slate-900 rounded-[2.5rem] p-10 text-white shadow-2xl relative overflow-hidden group">
-                            <BrainCircuit className="absolute -right-6 -bottom-6 w-48 h-48 text-indigo-500/20 group-hover:rotate-12 transition-transform duration-1000" />
-                            <h3 className="text-xl font-black mb-2">Protocol Launch</h3>
-                            <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-8 leading-relaxed">Instantiate new autonomous agent layer for deep-dive research.</p>
+                {/* Swarm Insight (Replaces Controller) */}
+                <motion.div 
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.6 }}
+                    className="lg:col-span-4 glass-panel p-10 border border-white/5 bg-slate-900 shadow-2xl relative overflow-hidden group flex flex-col items-center justify-center text-center"
+                >
+                    <div className="w-20 h-20 bg-teal-500/10 rounded-full flex items-center justify-center text-teal-400 mb-6 border border-teal-500/20 shadow-2xl shadow-teal-500/20">
+                        <Cpu size={32} className="animate-pulse" />
+                    </div>
+                    <h3 className="text-xl font-black text-white tracking-widest uppercase mb-4">Autonomous Mesh</h3>
+                    <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] max-w-[200px] leading-relaxed">
+                        The swarm is monitoring global trends. Trigger new cycles from the Bionic Workspace.
+                    </p>
+                </motion.div>
+            </div>
 
-                            <form onSubmit={handleTrigger} className="relative z-10 space-y-4">
-                                <div className="space-y-3">
-                                    <div className="relative">
-                                        <input
-                                            type="text"
-                                            value={topicInput}
-                                            onChange={(e) => setTopicInput(e.target.value)}
-                                            placeholder="Target Intelligence Topic..."
-                                            className="w-full bg-white/5 border border-white/10 rounded-2xl py-5 pl-12 pr-4 text-sm font-bold placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all font-mono"
-                                        />
-                                        <Terminal className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-indigo-500" />
-                                    </div>
-                                    <div className="relative">
-                                        <select
-                                            value={contentType}
-                                            onChange={(e) => setContentType(e.target.value)}
-                                            className="w-full bg-slate-800 border border-white/10 rounded-2xl py-4 px-4 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all cursor-pointer appearance-none"
-                                        >
-                                            <option value="blog">Blog (Long-form)</option>
-                                            <option value="article">Article (Long-form)</option>
-                                            <option value="instagram">Instagram</option>
-                                            <option value="twitter">Twitter (X)</option>
-                                            <option value="linkedin">LinkedIn</option>
-                                            <option value="meta">Meta (Facebook)</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <button
-                                    disabled={isTriggering || !topicInput.trim()}
-                                    className="w-full bg-indigo-600 text-white rounded-2xl py-5 font-black text-[10px] uppercase tracking-widest shadow-xl shadow-indigo-500/20 hover:bg-indigo-700 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
-                                >
-                                    {isTriggering ? 'Engaging Nodes...' : <><Play className="w-3 h-3" /> Execute Protocol</>}
-                                </button>
-                            </form>
-                        </div>
-
-                        {/* Circular Analytics */}
-                        <div className="bg-white rounded-[2.5rem] p-10 border border-slate-200 shadow-sm">
-                            <div className="flex items-center justify-between mb-8">
-                                <h3 className="text-lg font-black text-slate-900 tracking-tight">System Health</h3>
-                                <ArrowUpRight className="w-4 h-4 text-slate-300" />
-                            </div>
-                            <div className="h-[220px] relative">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <PieChart>
-                                        <Pie data={analytics?.seo_distribution || []} cx="50%" cy="50%" innerRadius={60} outerRadius={85} paddingAngle={10} dataKey="value">
-                                            {analytics?.seo_distribution?.map((e, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} cornerRadius={10} />)}
-                                        </Pie>
-                                        <Tooltip />
-                                    </PieChart>
-                                </ResponsiveContainer>
-                                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                                    <span className="text-4xl font-black text-slate-900 leading-none">94.2</span>
-                                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest mt-1">E-E-A-T Score</span>
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4 mt-8">
-                                {analytics?.seo_distribution?.slice(0, 4).map((item, i) => (
-                                    <div key={i} className="bg-slate-50/50 p-3 rounded-xl border border-slate-100">
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }}></div>
-                                            <span className="text-[14px] font-black text-slate-700">{item.value}</span>
+            {/* Live Operations Stream */}
+            <motion.div 
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.7 }}
+                className="glass-panel border border-white/5 overflow-hidden shadow-2xl bg-slate-900"
+            >
+                <div className="p-10 border-b border-white/5 flex items-center justify-between bg-slate-950/20 backdrop-blur-3xl">
+                    <div>
+                        <h3 className="text-xl font-black text-white tracking-widest uppercase">Live Process Stream</h3>
+                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-3 flex items-center gap-3">
+                            <span className="relative flex h-2 w-2">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2 w-2 bg-teal-500"></span>
+                            </span>
+                            Consensus Synchronized with Agent Swarm
+                        </p>
+                    </div>
+                </div>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                        <thead>
+                            <tr className="bg-slate-950/30">
+                                <th className="px-10 py-6 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Matrix Subject</th>
+                                <th className="px-10 py-6 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Protocol State</th>
+                                <th className="px-10 py-6 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Active Agent</th>
+                                <th className="px-10 py-6 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Node Confidence</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-white/5">
+                            {analytics?.recent_tasks?.length > 0 ? analytics.recent_tasks.map((task, i) => (
+                                <tr key={i} className="hover:bg-teal-400/[0.02] transition-colors group cursor-pointer">
+                                    <td className="px-10 py-8">
+                                        <div className="flex flex-col">
+                                            <p className="text-sm font-black text-slate-200 group-hover:text-teal-400 capitalize transition-colors mb-2">{task.topic}</p>
+                                            <span className="text-[8px] font-black text-slate-600 uppercase tracking-widest font-mono">TXN: {task.task_id?.slice(0, 12).toUpperCase() || '...'}</span>
                                         </div>
-                                        <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none">{item.name}</p>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
+                                    </td>
+                                    <td className="px-10 py-8">
+                                        <span className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-3 w-fit border ${
+                                            task.status === 'completed' ? 'bg-teal-500/10 text-teal-400 border-teal-500/20' :
+                                            task.status === 'running' || task.status === 'pending' ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' :
+                                            'bg-slate-800 text-slate-500 border-white/10'
+                                        }`}>
+                                            {(task.status === 'running' || task.status === 'pending') && <div className="w-2 h-2 rounded-full bg-amber-500 animate-ping shadow-[0_0_8px_rgba(245,158,11,0.5)]"></div>}
+                                            {task.status}
+                                        </span>
+                                    </td>
+                                    <td className="px-10 py-8">
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-10 h-10 rounded-xl bg-slate-950 border border-white/5 flex items-center justify-center text-slate-600 group-hover:text-teal-400 transition-colors">
+                                                <Cpu size={18} />
+                                            </div>
+                                            <div className="flex flex-col">
+                                                <span className="text-xs font-black text-slate-400 uppercase tracking-widest">{task.current_step || 'Awaiting Cycle'}</span>
+                                                <span className="text-[8px] font-bold text-slate-600 uppercase tracking-widest">Logic Node 0x{i+1}</span>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td className="px-10 py-8">
+                                        <div className="flex items-center gap-5">
+                                            <div className="w-40 bg-slate-950 h-2.5 rounded-full overflow-hidden border border-white/10 p-[1.5px] shadow-inner">
+                                                <motion.div 
+                                                    initial={{ width: 0 }}
+                                                    animate={{ width: `${85 + (i * 7) % 15}%` }}
+                                                    transition={{ duration: 2, ease: "circOut" }}
+                                                    className="bg-gradient-to-r from-teal-500 to-indigo-500 h-full rounded-full shadow-[0_0_15px_rgba(20,184,166,0.4)]"
+                                                />
+                                            </div>
+                                            <span className="text-[10px] font-black text-slate-500 tracking-tighter">{85 + (i * 7) % 15}%</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            )) : (
+                                <tr>
+                                    <td colSpan="4" className="px-10 py-20 text-center">
+                                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-600">No active process streams detected in vault</p>
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
                 </div>
-
-                {/* Bottom Interactive Row - Detailed Tables & Map */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 pb-10">
-
-                    {/* Live Operations Table */}
-                    <div className="lg:col-span-8 bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-                        <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-white relative z-10">
-                            <div>
-                                <h3 className="text-lg font-black text-slate-900 tracking-tight">Active Intelligence Nodes</h3>
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Direct stream from orchestrator kernel</p>
-                            </div>
-                            <div className="flex gap-2">
-                                <span className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[8px] font-black uppercase tracking-widest border border-emerald-100 flex items-center gap-1.5">
-                                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
-                                    Live Stream
-                                </span>
-                            </div>
-                        </div>
-                        <div className="overflow-x-auto flex-1">
-                            <table className="w-full text-left">
-                                <thead className="sticky top-0 bg-white shadow-sm z-10">
-                                    <tr className="bg-slate-50/30">
-                                        <th className="px-8 py-5 text-[9px] font-black text-slate-400 uppercase tracking-widest">Protocol Target</th>
-                                        <th className="px-8 py-5 text-[9px] font-black text-slate-400 uppercase tracking-widest">State</th>
-                                        <th className="px-8 py-5 text-[9px] font-black text-slate-400 uppercase tracking-widest">Active Node</th>
-                                        <th className="px-8 py-5 text-[9px] font-black text-slate-400 uppercase tracking-widest">Confidence</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-50">
-                                    {analytics?.recent_tasks?.map((task, i) => (
-                                        <tr key={i} className="hover:bg-slate-50/50 transition-all group">
-                                            <td className="px-8 py-5">
-                                                <p className="text-xs font-bold text-slate-800 group-hover:text-indigo-600 capitalize">{task.topic}</p>
-                                            </td>
-                                            <td className="px-8 py-5">
-                                                <span className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5 w-fit ${task.status === 'completed' ? 'bg-indigo-50 text-indigo-600' :
-                                                    task.status === 'running' ? 'bg-amber-50 text-amber-600 border border-amber-100' :
-                                                        'bg-slate-100 text-slate-400 font-bold'
-                                                    }`}>
-                                                    {task.status === 'running' && <div className="w-1 h-1 rounded-full bg-amber-500 animate-ping"></div>}
-                                                    {task.status}
-                                                </span>
-                                            </td>
-                                            <td className="px-8 py-5">
-                                                <div className="flex items-center gap-2">
-                                                    <Cpu className="w-3 h-3 text-slate-300" />
-                                                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{task.current_step || 'Kernel IDLE'}</span>
-                                                </div>
-                                            </td>
-                                            <td className="px-8 py-5">
-                                                <div className="w-24 bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                                                    <div className="bg-indigo-500 h-full rounded-full" style={{ width: `${85 + Math.random() * 10}%` }}></div>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    {/* World Map Simulation or Technical Projections */}
-                    <div className="lg:col-span-4 space-y-8">
-                        {/* Technical Projection vs Actual */}
-                        <div className="bg-white rounded-[2.5rem] p-10 border border-slate-200 shadow-sm flex flex-col h-full">
-                            <h3 className="text-lg font-black text-slate-900 tracking-tight">Latency vs Stability</h3>
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-8">Agent performance Benchmarks</p>
-
-                            <div className="flex-1 min-h-[300px]">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={analytics?.technical_stats?.latency_vs_accuracy || []}>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 8, fontWeight: 700 }} />
-                                        <Tooltip
-                                            cursor={{ fill: '#f8fafc' }}
-                                            contentStyle={{ borderRadius: '1.5rem', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                                        />
-                                        <Bar dataKey="accuracy" fill="#6366f1" radius={[6, 6, 0, 0]} barSize={20} />
-                                        <Bar dataKey="latency" fill="#e2e8f0" radius={[6, 6, 0, 0]} barSize={20} />
-                                    </BarChart>
-                                </ResponsiveContainer>
-                            </div>
-
-                            <div className="mt-6 flex justify-between pt-6 border-t border-slate-50">
-                                <div>
-                                    <p className="text-[18px] font-black text-slate-900 leading-none">1.2s</p>
-                                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mt-1">Avg Latency</p>
-                                </div>
-                                <div className="text-right">
-                                    <p className="text-[18px] font-black text-indigo-600 leading-none">99.9%</p>
-                                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mt-1">Kernel Uptime</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            </motion.div>
         </div>
     );
 };
 
-const StatCard = ({ title, value, change, icon, color, data }) => {
-    const colors = {
-        indigo: 'bg-indigo-50 text-indigo-600 border-indigo-100',
-        emerald: 'bg-emerald-50 text-emerald-600 border-emerald-100',
-        amber: 'bg-amber-50 text-amber-600 border-amber-100',
-        slate: 'bg-slate-900 text-white border-slate-800'
-    };
-
-    const chartColors = {
-        indigo: '#6366f1',
-        emerald: '#10b981',
-        amber: '#f59e0b',
-        slate: '#64748b'
-    };
-
+const StatCard = ({ title, value, change, icon, data, color, delay }) => {
     return (
-        <div className="bg-white rounded-[2.5rem] p-8 border border-slate-200 shadow-sm shadow-slate-200/50 hover:shadow-2xl hover:border-indigo-100 transition-all group overflow-hidden relative">
-            <div className="flex justify-between items-start mb-6 relative z-10">
-                <div className={`p-4 rounded-2xl ${colors[color]} shadow-lg shadow-black/5 transition-transform group-hover:scale-110 duration-500`}>
-                    {icon}
-                </div>
-                <div className="text-right">
-                    <span className={`text-[10px] font-black px-3 py-1.5 rounded-xl border ${change.startsWith('+') ? 'text-emerald-600 bg-emerald-50 border-emerald-100' : 'text-rose-600 bg-rose-50 border-rose-100'
-                        }`}>
-                        {change}
-                    </span>
-                </div>
-            </div>
-            <div className="relative z-10">
-                <h4 className="text-4xl font-black text-slate-900 tracking-tighter mb-1">{value}</h4>
-                <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest">{title}</p>
+        <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay }}
+            whileHover={{ y: -8, transition: { duration: 0.2 } }}
+            className="glass-panel p-8 relative overflow-hidden flex flex-col justify-between group border border-white/5 shadow-2xl bg-slate-900"
+        >
+            <div className="absolute top-0 right-0 p-4 opacity-10 blur-md group-hover:opacity-25 transition-opacity translate-x-3 -translate-y-3 pointer-events-none">
+                {React.cloneElement(icon, { size: 80 })}
             </div>
 
-            <div className="absolute right-0 bottom-0 w-32 h-16 opacity-30 pointer-events-none">
+            <div className="flex justify-between items-start mb-10 relative z-10">
+                <div className="w-14 h-14 bg-slate-950 rounded-2xl flex items-center justify-center border border-white/5 group-hover:border-teal-500/20 transition-all shadow-xl">
+                    {React.cloneElement(icon, { size: 22 })}
+                </div>
+                <div className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border shadow-lg ${
+                    change.startsWith('+') ? 'bg-teal-500/10 text-teal-400 border-teal-500/20 shadow-teal-500/5' : 'bg-red-500/10 text-red-500 border-red-500/20 shadow-red-500/5'
+                }`}>
+                    {change}
+                </div>
+            </div>
+            
+            <div className="relative z-10">
+                <h4 className="text-4xl font-black text-white tracking-tighter mb-2 leading-none">{value}</h4>
+                <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">
+                    {title}
+                </p>
+            </div>
+
+            <div className="absolute inset-x-0 bottom-0 h-24 opacity-20 pointer-events-none -mb-2 overflow-hidden">
                 <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={data || []}>
-                        <Line type="monotone" dataKey="v" stroke={chartColors[color]} strokeWidth={4} dot={false} />
-                    </LineChart>
+                    <AreaChart data={data || []}>
+                        <Area type="monotone" dataKey="v" stroke={color} fill={color} strokeWidth={4} dot={false} fillOpacity={0.2} />
+                    </AreaChart>
                 </ResponsiveContainer>
             </div>
-        </div>
+        </motion.div>
     );
 };
 

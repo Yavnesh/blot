@@ -33,6 +33,7 @@ if settings.BACKEND_CORS_ORIGINS:
         allow_headers=["*"],
     )
 
+
 from fastapi.staticfiles import StaticFiles
 import os
 
@@ -46,4 +47,4 @@ app.mount("/static", StaticFiles(directory=static_path), name="static")
 
 @app.get("/")
 def root():
-    return {"message": "Welcome to Tews CRM API"}
+    return {"message": "Welcome to Blot CRM API"}

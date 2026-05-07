@@ -1,10 +1,10 @@
-
-from sqlalchemy import Column, Integer, String, Text, DateTime, JSON
+from sqlalchemy import Column, Integer, String, Text, DateTime, JSON, ForeignKey
 from sqlalchemy.sql import func
 from app.db.base_class import Base
 
 class Post(Base):
     id = Column(Integer, primary_key=True, index=True)
+    org_id = Column(Integer, ForeignKey("organizations.id"), nullable=False, index=True)
     post_id = Column(String, default='none')
     title = Column(JSON, default=[])
     meta = Column(Text, default='none')
