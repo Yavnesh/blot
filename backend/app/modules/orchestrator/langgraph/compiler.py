@@ -5,6 +5,7 @@ from app.modules.orchestrator.langgraph.state import ArticleState
 from app.modules.orchestrator.langgraph.nodes.research import discovery_node, research_node, credibility_node
 from app.modules.orchestrator.langgraph.nodes.strategy import strategy_node
 from app.modules.orchestrator.langgraph.nodes.writing import writing_node
+from app.modules.orchestrator.langgraph.nodes.image import image_node
 from app.modules.orchestrator.langgraph.nodes.optimization import optimization_node
 from app.modules.orchestrator.langgraph.nodes.evaluation import evaluation_node
 from app.modules.orchestrator.langgraph.nodes.approval_gate import approval_gate_node
@@ -48,6 +49,7 @@ def compile_orchestrator_graph():
     workflow.add_node("credibility", debug_node(credibility_node, "credibility"))
     workflow.add_node("strategy", debug_node(strategy_node, "strategy"))
     workflow.add_node("writing", debug_node(writing_node, "writing"))
+    workflow.add_node("image", debug_node(image_node, "image"))
     workflow.add_node("optimization", debug_node(optimization_node, "optimization"))
     workflow.add_node("evaluation", debug_node(evaluation_node, "evaluation"))
     workflow.add_node("approval", debug_node(approval_gate_node, "approval"))
@@ -58,7 +60,8 @@ def compile_orchestrator_graph():
     workflow.add_edge("research", "credibility")
     workflow.add_edge("credibility", "strategy")
     workflow.add_edge("strategy", "writing")
-    workflow.add_edge("writing", "optimization")
+    workflow.add_edge("writing", "image")
+    workflow.add_edge("image", "optimization")
     workflow.add_edge("optimization", "evaluation")
     
     # 4. Define AI Reflection Logic

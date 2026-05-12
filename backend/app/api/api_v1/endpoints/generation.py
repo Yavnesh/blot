@@ -147,6 +147,31 @@ async def get_task_status(
         "updated_at": progress.updated_at
     }
 
+@router.delete("/task/{task_id}", response_model=dict)
+async def delete_generation_task(
+    task_id: str,
+    db: Session = Depends(deps.get_db),
+    current_org: Organization = Depends(deps.get_current_active_org)
+) -> Any:
+    """
+    Cancel and delete a generation task.
+    """
+    progress = db.query(TaskProgress).filter(TaskProgress.task_id == task_id, TaskProgress.org_id == current_org.id).first()
+    if not progress:
+        raise HTTPException(status_code=404, detail="Task not found")
+        
+    # Revoke Celery task if it's running
+    try:
+        from app.core.celery_app import celery_app
+        celery_app.control.revoke(task_id, terminate=True)
+    except Exception as e:
+        print(f"Failed to revoke task {task_id}: {e}")
+    
+    db.delete(progress)
+    db.commit()
+    
+    return {"message": "Task cancelled and deleted"}
+
 @router.get("/tasks", response_model=List[dict])
 async def get_all_tasks_status(
     db: Session = Depends(deps.get_db),

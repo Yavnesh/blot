@@ -46,12 +46,21 @@ class ReadabilityAgent(BaseAgent):
         # Calculate Deterministic Readability AFTER
         score_after = textstat.flesch_reading_ease(clear_content)
         
+        # Map score to grade level
+        grade_level = "Standard"
+        if score_after > 80: grade_level = "Easy"
+        elif score_after > 60: grade_level = "Standard"
+        elif score_after > 40: grade_level = "Professional"
+        else: grade_level = "Advanced"
+
         return AgentOutput(
             data={
                 "clear_content": clear_content,
                 "readability_score_before": score_before,
                 "readability_score_after": score_after,
+                "readability_score": score_after, # alias for optimization node
                 "readability_improvement": score_after - score_before,
+                "grade_level": grade_level,
                 "confidence_score": 90.0
             },
             prompt=prompt,

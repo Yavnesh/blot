@@ -15,9 +15,9 @@ const NODES = [
 ];
 
 const OrchestratorStepper = memo(() => {
-    const { activePipeline, setSelectedNode } = useOrchestratorStore();
-    const currentNode = activePipeline.current_node;
-    const selectedNode = activePipeline.selectedNode;
+    const { activePipeline = {}, setSelectedNode } = useOrchestratorStore();
+    const currentNode = activePipeline?.current_node || 'discovery';
+    const selectedNode = activePipeline?.selectedNode;
 
     const getNodeStatus = (nodeId) => {
         const order = NODES.map(n => n.id);

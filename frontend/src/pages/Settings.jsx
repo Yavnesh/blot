@@ -148,7 +148,10 @@ const Settings = () => {
                         </div>
                     </div>
 
-                    <div className="glass-panel p-10 border border-white/5 bg-slate-900 shadow-2xl relative">
+                    <div className="glass-panel p-10 border border-white/5 bg-slate-900 shadow-2xl relative overflow-hidden">
+                        <div className="absolute top-0 right-0 p-8 opacity-5">
+                            <Cloud size={120} />
+                        </div>
                         <h3 className="text-sm font-black text-white uppercase tracking-widest mb-8 flex items-center gap-3">
                             <Cloud size={16} className="text-teal-400" />
                             Orchestrator Defaults
@@ -163,6 +166,44 @@ const Settings = () => {
                                     <div className="absolute right-1 top-1 w-4 h-4 bg-white rounded-full shadow-sm" />
                                 </div>
                             </div>
+                        </div>
+                    </div>
+
+                    <div className="glass-panel p-10 border border-white/5 bg-slate-900 shadow-2xl relative overflow-hidden group">
+                        <div className="absolute -right-10 -top-10 w-40 h-40 bg-teal-500/5 rounded-full blur-3xl group-hover:bg-teal-500/10 transition-all" />
+                        <h3 className="text-sm font-black text-white uppercase tracking-widest mb-8 flex items-center gap-3">
+                            <Zap size={16} className="text-amber-400" />
+                            Subscription & Node Capacity
+                        </h3>
+                        
+                        <div className="bg-slate-950/50 rounded-3xl p-8 border border-white/5 space-y-8">
+                            <div className="flex justify-between items-center">
+                                <div>
+                                    <span className="text-[10px] font-black uppercase text-slate-500 tracking-widest mb-1 block">Active Protocol</span>
+                                    <h4 className="text-xl font-black text-white uppercase tracking-tighter">
+                                        {user?.organizations?.[0]?.plan_id === 'pro_tier' ? 'Bionic Professional' : 'Basic Compute'}
+                                    </h4>
+                                </div>
+                                <div className="px-4 py-2 bg-teal-500/10 border border-teal-500/20 rounded-xl">
+                                    <span className="text-[10px] font-black text-teal-400 uppercase tracking-widest">
+                                        {user?.organizations?.[0]?.subscription_status || 'Trial'}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div className="space-y-3">
+                                <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-slate-500 px-1">
+                                    <span>Generation Quota</span>
+                                    <span>84% Used</span>
+                                </div>
+                                <div className="h-2 bg-slate-900 rounded-full overflow-hidden border border-white/5">
+                                    <div className="h-full bg-gradient-to-r from-teal-500 to-amber-500 w-[84%]" />
+                                </div>
+                            </div>
+
+                            <button className="w-full h-16 bg-white text-slate-950 text-[10px] font-black uppercase tracking-[0.3em] rounded-2xl hover:bg-teal-400 transition-all transform hover:-translate-y-1 active:scale-[0.98]">
+                                Manage Subscription
+                            </button>
                         </div>
                     </div>
                 </div>

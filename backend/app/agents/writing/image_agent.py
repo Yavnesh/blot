@@ -30,7 +30,7 @@ class ImageAgent(BaseAgent):
         import random 
         
         # Prepare an image core prompt
-        base_prompt = f"High quality cinematic 8k illustration representing {topic}"
+        base_prompt = f"High quality cinematic illustration representing {topic}"
         if input_data.get("seo_data") and input_data.get("seo_data").get("focus_keyword"):
             base_prompt += f", focusing on {input_data['seo_data']['focus_keyword']}"
             
@@ -49,8 +49,8 @@ class ImageAgent(BaseAgent):
             logger.info("Invoking Google API for image generation (Mock / Fallback)")
             # Generate random images using Picsum / Default handling
             for i in range(1, 4):
-                width = random.choice([1200, 1000, 800])
-                height = random.choice([600, 500, 400])
+                width = random.choice([800])  # 1200, 1000, 800
+                height = random.choice([400]) # 600, 500, 400
                 rand_id = random.randint(1, 1000)
                 url = f"https://picsum.photos/id/{rand_id}/{width}/{height}"
                 images_data.append({

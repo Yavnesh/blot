@@ -50,12 +50,18 @@ export const useOrchestratorStore = create((set, get) => ({
         contentState: { ...state.contentState, seo_data: seoData }
     })),
     
-    addLog: (log) => set((state) => ({
-        activePipeline: {
-            ...state.activePipeline,
-            logs: [...state.activePipeline.logs, log]
-        }
-    })),
+    addLog: (log) => set((state) => {
+        const isDuplicate = state.activePipeline.logs.some(
+            l => l.step === log.step && (l.text === log.text || l.message === log.text)
+        );
+        if (isDuplicate) return state;
+        return {
+            activePipeline: {
+                ...state.activePipeline,
+                logs: [...state.activePipeline.logs, log]
+            }
+        };
+    }),
     
     toggleView: () => set((state) => ({
         uiView: state.uiView === 'editor' ? 'map' : 'editor'

@@ -124,7 +124,8 @@ class CredibilityAgent(BaseAgent):
         if "REFINED_TOPIC:" in content:
             parts = content.split("REFINED_TOPIC:")
             verification_report = parts[0].replace("REPORT:", "").strip()
-            refined_topic = parts[1].strip().split("\n")[0].replace('"', '').replace("'", "")
+            # Strip quotes and markdown bolding
+            refined_topic = parts[1].strip().split("\n")[0].replace('"', '').replace("'", "").replace("**", "").strip()
         else:
             verification_report = content
             

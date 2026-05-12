@@ -128,6 +128,7 @@ async def generate_structured_async(prompt: str, output_schema: type, model_id: 
 async def generate_embeddings(text: str, model_id: str = "gemini-embedding-001"):
     """
     Generate embeddings for the given text using the modern SDK.
+    Explicitly forces 768 dimensions to match the PostgreSQL 'asset_embeddings' schema.
     """
     exclude_keys = []
     all_keys = get_all_api_keys()
@@ -136,25 +137,41 @@ async def generate_embeddings(text: str, model_id: str = "gemini-embedding-001")
         try:
             client, current_key = get_client(exclude_keys)
             try:
+                # We force 768 to align with our DB schema. 
+                # Note: text-embedding-004 is newer but often hits 404 on v1beta keys.
+                config = None
+                if model_id == "text-embedding-004":
+                    config = types.EmbedContentConfig(output_dimensionality=768)
+                
                 response = await client.aio.models.embed_content(
                     model=model_id,
-                    contents=text
+                    contents=text,
+                    config=config
                 )
-                return response.embeddings[0].values
+                vec = response.embeddings[0].values
+                # Strict enforcement: Truncate or Pad to 768 to ensure DB compatibility
+                return vec[:768] if len(vec) >= 768 else vec + [0.0] * (768 - len(vec))
             except Exception as inner_e:
-                logger.warning(f"Embedding attempt failed for {model_id}: {inner_e}")
+                # Suppress warning for 404 on text-embedding-004
+                if "404" in str(inner_e) and model_id == "text-embedding-004":
+                    logger.debug(f"text-embedding-004 not found, falling back.")
+                else:
+                    logger.warning(f"Embedding attempt failed for {model_id}: {inner_e}")
+                
                 if model_id != "gemini-embedding-001":
-                    logger.info("Falling back to gemini-embedding-001")
                     response = await client.aio.models.embed_content(
                         model="gemini-embedding-001",
                         contents=text
                     )
-                    return response.embeddings[0].values
+                    vec = response.embeddings[0].values
+                    return vec[:768] if len(vec) >= 768 else vec + [0.0] * (768 - len(vec))
                 raise inner_e
         except Exception as e:
             logger.error(f"Global Embedding Error: {e}")
-            break
+            # If we fail, rotate keys or break
+            continue
     
+    # Absolute fallback (silent failure but allows task to complete)
     return [0.0] * 768
 
 async def describe_image(image_bytes: bytes, mime_type: str):

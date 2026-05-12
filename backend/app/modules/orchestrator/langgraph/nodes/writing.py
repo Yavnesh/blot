@@ -59,7 +59,8 @@ async def writing_node(state: ArticleState) -> Dict[str, Any]:
     voice_input = {
         "draft_content": initial_draft,
         "brand_rules": state.get("brand_voice_prompt", "Authoritative, Insightful, and Human-centric."),
-        "personalization": state.get("personalization", {})
+        "personalization": state.get("personalization", {}),
+        "org_id": state.get("org_id")
     }
     
     voice_result = await voice_agent.run(voice_input)

@@ -62,18 +62,23 @@ async def research_node(state: ArticleState) -> Dict[str, Any]:
         doc_ids = state.get("context_document_ids")
         if mode in ["vault", "hybrid"] and doc_ids:
             from app.core.clients import genai_client
-            from app.models.rag import AssetEmbedding
             from sqlalchemy import and_
+            from app.models.rag import WorkspaceAsset, AssetEmbedding
 
             logger.info(f"LangGraph [Research]: Querying Knowledge Vault for Doc IDs: {doc_ids}")
             query_vec = await genai_client.generate_embeddings(state["resolved_topic"])
             
-            # Semantic search across selected organization assets
-            chunks = db.query(AssetEmbedding).filter(
-                and_( AssetEmbedding.asset_id.in_(doc_ids), AssetEmbedding.asset_id != None )
+            # Semantic search across selected organization assets (strictly scoped to org_id)
+            chunks = db.query(AssetEmbedding).join(WorkspaceAsset).filter(
+                and_( 
+                    AssetEmbedding.asset_id.in_(doc_ids), 
+                    WorkspaceAsset.org_id == state.get("org_id")
+                )
             ).order_by(AssetEmbedding.embedding.l2_distance(query_vec)).limit(10).all()
 
+            unique_asset_ids = set()
             for chunk in chunks:
+                unique_asset_ids.add(chunk.asset_id)
                 internal_findings.append({
                     "title": f"Internal Archive: {chunk.asset.name}",
                     "link": f"asset://{chunk.asset_id}",
@@ -81,13 +86,14 @@ async def research_node(state: ArticleState) -> Dict[str, Any]:
                     "source": "INTERNAL_AUTHORITY",
                     "relevance": 100
                 })
-            logger.info(f"LangGraph [Research]: Retrieved {len(internal_findings)} internal context chunks.")
+            logger.info(f"LangGraph [Research]: Retrieved {len(internal_findings)} chunks from {len(unique_asset_ids)} unique assets.")
 
         # 3. MERGE & FINALIZE
-        # If 'vault' only, it's 100% proprietary. If 'hybrid', internal is prepended as authority.
         combined_data = internal_findings + external_research
         
-        status_msg = f"Sources: {len(external_research)} Web | {len(internal_findings)} Internal."
+        # Count unique internal source documents for the UI
+        internal_source_count = len(set(f["link"] for f in internal_findings))
+        status_msg = f"Sources: {len(external_research)} Web | {internal_source_count} Internal."
         if mode == "vault" and not internal_findings:
             status_msg = "WARNING: Vault Mode active but no relevant internal context found."
 

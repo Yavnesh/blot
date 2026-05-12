@@ -49,21 +49,27 @@ async def optimization_node(state: ArticleState) -> Dict[str, Any]:
     originality_data = originality_result.data
     legal_data = legal_result.data
     
+    # 5. Aggregate SEO Pack (Merges full agent results for storage)
+    seo_pack = {
+        **seo_data,
+        "score": float(seo_data.get("score", 0)),
+        "coverage": float(seo_data.get("coverage_score", 0)),
+        "readability": float(readability_data.get("readability_score", 0)),
+        "originality": float(originality_data.get("originality_score", 0)),
+        "legal_clearance": bool(legal_data.get("legal_clearance", True)),
+        "readability_grade": readability_data.get("grade_level", "Standard")
+    }
+    
     return {
         "seo_score": float(seo_data.get("score", 0)),
         "readability_score": float(readability_data.get("readability_score", 0)),
         "originality_score": float(originality_data.get("originality_score", 0)),
-        "legal_clearance": legal_data.get("legal_clearance", True),
+        "legal_clearance": bool(legal_data.get("legal_clearance", True)),
+        "seo_pack": seo_pack,
         "logs": [
-            f"SEO Score: {seo_data.get('score')}%",
-            f"Readability Grade: {readability_data.get('grade_level')}",
-            f"Originality Confirmed: {originality_data.get('originality_score')}%",
-            f"Legal Compliance: {'PASSED' if legal_data.get('legal_clearance') else 'FLAGGED'}"
-        ],
-        "full_optimization_report": {
-            "seo": seo_data,
-            "readability": readability_data,
-            "originality": originality_data,
-            "legal": legal_data
-        }
+            f"SEO Score: {seo_data.get('score', 0)}% | Coverage: {seo_data.get('coverage_score', 0)}%",
+            f"Readability Grade: {readability_data.get('grade_level', 'Standard')}",
+            f"Originality Confirmed: {originality_data.get('originality_score', 0)}%",
+            f"Legal Compliance: {'PASSED' if legal_data.get('legal_clearance', True) else 'FLAGGED'}"
+        ]
     }

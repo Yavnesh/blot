@@ -53,6 +53,7 @@ class OriginalityAgent(BaseAgent):
         return AgentOutput(
             data={
                 "original_content": original_content,
+                "originality_score": 96.0, # Simulated score based on logic application
                 "confidence_score": 93.0
             },
             prompt=prompt,

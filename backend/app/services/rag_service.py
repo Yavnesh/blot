@@ -135,8 +135,11 @@ async def process_and_embed_asset(db, asset_id: int, file_bytes: bytes, file_typ
         
     except Exception as err:
         logger.error(f"Multimodal Failure for {asset_id}: {err}")
-        asset.status = "error"
-        db.commit()
+        db.rollback() # Reset session state before marking error
+        asset = db.query(WorkspaceAsset).get(asset_id)
+        if asset:
+            asset.status = "error"
+            db.commit()
 
 async def retrieve_context(db, org_id: int, query: str, limit: int = 5) -> List[str]:
     """

@@ -133,23 +133,23 @@ const Topics = () => {
     );
 
     return (
-        <div className="max-w-[1720px] mx-auto p-4 lg:p-0 space-y-12">
-            <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+        <div className="w-full max-w-[1720px] mx-auto p-4 md:p-8 lg:p-12 space-y-8 md:space-y-12 pb-32">
+            <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-6">
                 <div>
-                    <h1 className="text-3xl font-black tracking-tighter text-white flex items-center gap-3">
-                        <Globe className="text-teal-400 w-8 h-8" />
+                    <h1 className="text-2xl md:text-3xl font-black tracking-tighter text-white flex items-center gap-3">
+                        <Globe className="text-teal-400 w-6 h-6 md:w-8 md:h-8" />
                         Discovery <span className="text-teal-400">Hub</span>
                     </h1>
-                    <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.3em] mt-3">
+                    <p className="text-slate-500 text-[8px] md:text-[10px] font-black uppercase tracking-[0.2em] md:tracking-[0.3em] mt-3">
                         Autonomous Market Intelligence & Trend Scanning
                     </p>
                 </div>
-                <button className="h-14 px-8 bg-teal-600 hover:bg-teal-500 text-white text-[10px] font-black uppercase tracking-widest rounded-2xl shadow-xl shadow-teal-500/10 transition-all active:scale-[0.98] flex items-center gap-3 group">
+                <button className="h-12 md:h-14 px-6 md:px-8 bg-teal-600 hover:bg-teal-500 text-white text-[9px] md:text-[10px] font-black uppercase tracking-widest rounded-xl md:rounded-2xl shadow-xl shadow-teal-500/10 transition-all active:scale-[0.98] flex items-center justify-center gap-3 group w-full sm:w-auto">
                     Scan Market Vector <ArrowUpRight className="group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" size={16} />
                 </button>
             </header>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 pb-24">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8 pb-24">
                 {topics.map((topic, i) => {
                     const latestTask = tasks[topic.topic];
                     const isProcessing = latestTask?.status === 'running' || latestTask?.status === 'pending';
@@ -160,16 +160,16 @@ const Topics = () => {
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: i * 0.05 }}
                             key={topic.id} 
-                            className={`glass-panel p-10 border border-white/5 flex flex-col group relative overflow-hidden transition-all hover:bg-slate-900 ${isProcessing ? 'border-teal-500/30 bg-teal-500/5' : ''}`}
+                            className={`glass-panel p-6 md:p-10 border border-white/5 flex flex-col group relative overflow-hidden transition-all hover:bg-slate-900 rounded-2xl md:rounded-3xl ${isProcessing ? 'border-teal-500/30 bg-teal-500/5' : ''}`}
                         >
-                            <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity pointer-events-none">
-                                <TrendingUp size={120} />
+                            <div className="absolute top-0 right-0 p-6 md:p-8 opacity-5 group-hover:opacity-10 transition-opacity pointer-events-none">
+                                <TrendingUp size={80} className="md:size-[120px]" />
                             </div>
 
-                            <div className="flex items-center justify-between mb-8 relative z-10">
+                            <div className="flex items-center justify-between mb-6 md:mb-8 relative z-10">
                                 <div className="flex gap-2">
-                                    <span className="text-[8px] font-black bg-slate-950 text-slate-500 px-2 py-1 rounded-lg border border-white/5 tracking-widest">#{topic.id}</span>
-                                    <span className={`px-4 py-1 rounded-full text-[8px] font-black uppercase tracking-widest border ${
+                                    <span className="text-[7px] md:text-[8px] font-black bg-slate-950 text-slate-500 px-2 py-1 rounded-lg border border-white/5 tracking-widest">#{topic.id}</span>
+                                    <span className={`px-3 md:px-4 py-1 rounded-full text-[7px] md:text-[8px] font-black uppercase tracking-widest border ${
                                         topic.status === 'New' ? 'bg-teal-500/10 text-teal-400 border-teal-500/20' : 'bg-slate-950 text-slate-500 border-white/5'
                                     }`}>
                                         {topic.status}
@@ -178,14 +178,14 @@ const Topics = () => {
                                 {topic.trend_score > 0 && (
                                     <div className="flex items-center gap-2">
                                         <TrendingUp size={12} className="text-teal-400" />
-                                        <span className="text-[10px] font-black text-white">{topic.trend_score}</span>
+                                        <span className="text-[9px] md:text-[10px] font-black text-white">{topic.trend_score}</span>
                                     </div>
                                 )}
                             </div>
 
-                            <h2 className="text-2xl font-black text-white mb-4 leading-tight tracking-tight group-hover:text-teal-400 transition-colors">{topic.topic}</h2>
+                            <h2 className="text-xl md:text-2xl font-black text-white mb-4 leading-tight tracking-tight group-hover:text-teal-400 transition-colors min-h-[3rem] line-clamp-2">{topic.topic}</h2>
                             
-                            <div className="flex items-center gap-3 text-slate-500 text-[10px] font-black uppercase tracking-widest mb-8">
+                            <div className="flex items-center gap-3 text-slate-500 text-[8px] md:text-[10px] font-black uppercase tracking-widest mb-6 md:mb-8">
                                 <span className="flex items-center gap-2 bg-slate-950 px-3 py-1.5 rounded-xl border border-white/5">
                                     <BrainCircuit size={12} className="text-teal-400/50" />
                                     {topic.source || 'Genetic Engine'}
@@ -196,9 +196,9 @@ const Topics = () => {
                                 <InlineAgentStatus taskId={latestTask.task_id} taskData={latestTask} />
                             )}
 
-                            <div className="mt-12 pt-8 border-t border-white/5 flex gap-4">
+                            <div className="mt-auto pt-8 border-t border-white/5 flex gap-3 md:gap-4">
                                 <button 
-                                    className={`flex-1 h-16 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-[0.98] ${
+                                    className={`flex-1 h-12 md:h-16 rounded-xl md:rounded-2xl text-[8px] md:text-[10px] font-black uppercase tracking-widest transition-all active:scale-[0.98] ${
                                         latestTask?.status === 'completed' 
                                         ? 'bg-white text-slate-950 hover:bg-slate-100' 
                                         : 'bg-teal-600 text-white hover:bg-teal-500 shadow-xl shadow-teal-500/10'
@@ -207,8 +207,8 @@ const Topics = () => {
                                     {latestTask?.status === 'completed' ? 'View Intel' : 'Launch Pipeline'}
                                 </button>
                                 {latestTask && (
-                                    <button className="w-16 h-16 rounded-2xl bg-slate-950 border border-white/5 text-slate-500 hover:text-white hover:border-white/10 flex items-center justify-center transition-all">
-                                        <RefreshCw size={18} />
+                                    <button className="w-12 md:w-16 h-12 md:h-16 rounded-xl md:rounded-2xl bg-slate-950 border border-white/5 text-slate-600 hover:text-white hover:border-white/10 flex items-center justify-center transition-all shrink-0">
+                                        <RefreshCw size={16} md:size={18} />
                                     </button>
                                 )}
                             </div>

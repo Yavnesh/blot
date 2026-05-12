@@ -32,7 +32,8 @@ async def run_langgraph_pipeline(job_id: str, org_id: int, langgraph_state: dict
         # LangGraph emits events as a dict where keys are node names
         for node_name, state_update in event.items():
             if not isinstance(state_update, dict):
-                logger.warning(f"Node '{node_name}' yielded non-dict state: {type(state_update)}")
+                if node_name != "__interrupt__":
+                    logger.debug(f"System node '{node_name}' yielding metadata.")
                 continue
                 
             logger.info(f"Node '{node_name}' finished for Job ID {job_id}")
@@ -119,6 +120,8 @@ def execute_seo_pipeline_task(self, job_id: str, initial_state: dict):
         "all_images": [],
         "loop_count": 0,
         "is_approved": False,
+        "context_document_ids": initial_state.get("context_document_ids", []),
+        "research_mode": initial_state.get("research_mode", "hybrid"),
         "personalization": personalization,
         "logs": ["LangGraph Orchestrator initialized successfully."]
     }
@@ -159,18 +162,19 @@ def execute_seo_pipeline_task(self, job_id: str, initial_state: dict):
                 # Extract word count
                 word_count = len(content_str.split())
                 
+                seo_pack = final_state.get("seo_pack", {})
+                
                 new_post = Post(
                     org_id=org_id,
-                    title=[title_str], # Post model expects JSON list for title/content
+                    title=[title_str],
                     content=[content_str],
+                    meta=seo_pack.get("meta_description", "Expertly synthesized content."),
                     word_count=word_count,
                     status="Draft",
-                    seo_data=final_state.get("seo_pack", {
-                        "score": final_state.get("seo_score", 0),
-                        "readability": final_state.get("readability_score", 0),
-                        "originality": final_state.get("originality_score", 0)
-                    }),
+                    tags=seo_pack.get("hashtags", []),
+                    seo_data=seo_pack,
                     research_sources=final_state.get("serp_data", []),
+                    image_crm=[final_state.get("cover_image", {}).get("crm_path")] if final_state.get("cover_image") else [],
                     agent_telemetry=final_state.get("logs", [])
                 )
                 db.add(new_post)

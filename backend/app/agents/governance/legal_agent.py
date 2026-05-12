@@ -104,6 +104,7 @@ class LegalAgent(BaseAgent):
                 "is_defamatory": is_defamatory,
                 "requires_disclaimer": structured_data.get("requires_disclaimer", False),
                 "predicted_category": structured_data.get("category", category),
+                "legal_clearance": not (is_red_line or is_defamatory),
                 "confidence_score": 99.0
             },
             prompt=prompt,

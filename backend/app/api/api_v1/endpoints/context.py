@@ -153,8 +153,39 @@ async def extract_company_context(
     db.commit()
     db.refresh(current_org)
     
-    return {
-        "status": "success",
-        "message": f"Successfully updated profile for {profile.get('company_name')}",
-        "profile": profile
-    }
+from fastapi.responses import FileResponse
+
+import mimetypes
+
+@router.get("/{asset_id}/file")
+def get_context_document_file(
+    asset_id: int,
+    db: Session = Depends(deps.get_db),
+    current_org: Organization = Depends(deps.get_current_active_org)
+):
+    """
+    Returns the physical file for the given asset ID.
+    Used for viewing/downloading from the Knowledge Vault.
+    """
+    asset = db.query(WorkspaceAsset).filter(
+        WorkspaceAsset.id == asset_id,
+        WorkspaceAsset.org_id == current_org.id
+    ).first()
+
+    if not asset or not asset.s3_path:
+        raise HTTPException(status_code=404, detail="Asset file not found")
+
+    if not os.path.exists(asset.s3_path):
+        logger.error(f"File missing on disk: {asset.s3_path}")
+        raise HTTPException(status_code=404, detail="File missing on disk")
+
+    # Detect MIME type
+    mime_type, _ = mimetypes.guess_type(asset.s3_path)
+    if not mime_type:
+        mime_type = "application/octet-stream"
+
+    return FileResponse(
+        path=asset.s3_path,
+        filename=asset.name,
+        media_type=mime_type
+    )
