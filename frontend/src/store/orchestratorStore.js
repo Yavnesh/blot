@@ -72,7 +72,7 @@ export const useOrchestratorStore = create((set, get) => ({
         if (isOpen) get().fetchVaultAssets();
     },
 
-    triggerPipeline: async (topic, contentType = 'blog') => {
+    triggerPipeline: async (topic, pipelineType = 'blog', options = {}) => {
         set((state) => ({
             activePipeline: {
                 ...state.activePipeline,
@@ -87,8 +87,14 @@ export const useOrchestratorStore = create((set, get) => ({
             const { selectedAssetIds } = get();
             await api.post('/generation/trigger', { 
                 user_topic: topic, 
-                include_images: true, 
-                content_type: contentType,
+                include_images: pipelineType !== 'instagram', 
+                pipeline_type: pipelineType,
+                instagram_format: options.instagram_format || 'carousel',
+                tone: options.tone || 'educational',
+                audience: options.audience || 'developers',
+                word_count_target: options.word_count_target || 1500,
+                target_audience_taxonomy: options.target_audience_taxonomy || null,
+                editorial_tone_taxonomy: options.editorial_tone_taxonomy || null,
                 context_document_ids: selectedAssetIds,
                 research_mode: selectedAssetIds.length > 0 ? 'hybrid' : 'web'
             });
@@ -97,6 +103,37 @@ export const useOrchestratorStore = create((set, get) => ({
             set((state) => ({ activePipeline: { ...state.activePipeline, status: 'error' } }));
         }
     },
+
+    loadTask: async (task_id) => {
+        try {
+            const res = await api.get(`/generation/status/${task_id}`);
+            const data = res.data;
+            
+            set({
+                activePipeline: {
+                    job_id: data.task_id,
+                    topic: data.topic,
+                    current_node: data.current_step || 'discovery',
+                    status: data.status || 'running',
+                    logs: data.logs || []
+                },
+                contentState: {
+                    draft: data.preview_data?.content || '',
+                    seo_data: {
+                        score: data.preview_data?.seo_score || 0,
+                        keywords: [],
+                        suggestions: []
+                    },
+                    agent_feedback: []
+                }
+            });
+            return data;
+        } catch (err) {
+            console.error("Load Task Error:", err);
+            throw err;
+        }
+    },
+
 
     // 5. HITL Actions
     approveTask: async (job_id, feedback = "") => {

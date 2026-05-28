@@ -55,6 +55,8 @@ class OrganizationBase(BaseModel):
     key_messages: Optional[str] = None
     competitors: Optional[str] = None
     personalization_enabled: Optional[bool] = True
+    blog_sources: Optional[List[dict]] = None
+    instagram_sources: Optional[List[dict]] = None
 
 class OrganizationCreate(OrganizationBase):
     name: str

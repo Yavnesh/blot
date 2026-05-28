@@ -15,6 +15,14 @@ class ArticleState(TypedDict):
     resolved_topic: Optional[str]
     context_document_ids: Optional[List[int]] = []
     research_mode: str = "hybrid" # vault, web, hybrid
+    pipeline_type: str # 'blog' or 'instagram'
+    instagram_format: Optional[str]
+    tone: Optional[str]
+    audience: Optional[str]
+    word_count_target: Optional[int]
+    target_audience_taxonomy: Optional[Dict[str, Any]]
+    editorial_tone_taxonomy: Optional[Dict[str, Any]]
+
     
     # 2. Research Data
     reuse_scrape: bool

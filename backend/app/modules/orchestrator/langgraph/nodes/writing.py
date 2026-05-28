@@ -10,7 +10,39 @@ async def writing_node(state: ArticleState) -> Dict[str, Any]:
     """
     Orchestrates the drafting and voice personalization phase.
     """
-    logger.info(f"LangGraph [Writing]: Drafting the article for '{state['resolved_topic']}'")
+    logger.info(f"LangGraph [Writing]: Drafting for '{state['resolved_topic']}' ({state.get('pipeline_type', 'blog')})")
+    
+    if state.get("pipeline_type") == "instagram":
+        from app.agents.writing.instagram_generation_agent import InstagramGenerationAgent
+        agent = InstagramGenerationAgent()
+        result = await agent.run({
+            "verified_research": state.get("serp_data", []),
+            "topic": state["resolved_topic"],
+            "tone": state.get("tone", "educational"),
+            "audience": state.get("audience", "developers"),
+            "instagram_format": state.get("instagram_format", "carousel"),
+            "strategy": state.get("serp_blueprint", {}),
+            "personalization": state.get("personalization", {}),
+            "target_audience_taxonomy": state.get("target_audience_taxonomy"),
+            "editorial_tone_taxonomy": state.get("editorial_tone_taxonomy")
+        })
+        if result.status != "success":
+            return {
+                "current_draft": None,
+                "logs": [f"Instagram generation failed: {result.feedback}"]
+            }
+        
+        import json
+        draft_str = json.dumps(result.data)
+        return {
+            "draft_iterations": [draft_str],
+            "current_draft": draft_str,
+            "logs": [
+                "Instagram content generated successfully.",
+                f"Slides: {len(result.data.get('slides', []))} | Caption length: {len(result.data.get('caption', ''))} characters"
+            ]
+        }
+
     
     # NEW: Enterprise RAG Retrieval Step
     db = SessionLocal()

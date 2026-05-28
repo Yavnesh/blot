@@ -15,7 +15,8 @@ import {
     Bell,
     BrainCircuit,
     Layers,
-    Search
+    Search,
+    Instagram
 } from 'lucide-react';
 
 const DashboardLayout = ({ children }) => {
@@ -26,6 +27,8 @@ const DashboardLayout = ({ children }) => {
     const navItems = [
         { name: 'Intelligence Ledger', path: '/ledger', icon: <LayoutDashboard size={18} /> },
         { name: 'Bionic Workspace', path: '/workspace', icon: <Zap size={18} /> },
+        { name: 'Instagram Workspace', path: '/instagram-workspace', icon: <Instagram size={18} /> },
+        { name: 'Instagram Ledger', path: '/instagram-ledger', icon: <LayoutDashboard size={18} /> },
         { name: 'Discovery Hub', path: '/topics', icon: <Globe size={18} /> },
         { name: 'Research Engine', path: '/scrape', icon: <Search size={18} /> },
         { name: 'Post Repository', path: '/posts', icon: <Terminal size={18} /> },

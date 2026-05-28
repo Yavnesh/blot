@@ -45,6 +45,29 @@ if not os.path.exists(static_path):
     os.makedirs(static_path, exist_ok=True)
 app.mount("/static", StaticFiles(directory=static_path), name="static")
 
+@app.on_event("startup")
+def startup_event():
+    from app.db.base import Base
+    from app.db.session import engine, SessionLocal
+    from app.db.seed_taxonomy import seed_taxonomy
+    
+    # Automatically create missing tables
+    Base.metadata.create_all(bind=engine)
+    
+    # Run migrations for existing organizations table if PostgreSQL
+    if engine.dialect.name == "postgresql":
+        from sqlalchemy import text
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE organizations ADD COLUMN IF NOT EXISTS blog_sources JSON DEFAULT '[]'::json;"))
+            conn.execute(text("ALTER TABLE organizations ADD COLUMN IF NOT EXISTS instagram_sources JSON DEFAULT '[]'::json;"))
+    
+    # Run the seeder
+    db = SessionLocal()
+    try:
+        seed_taxonomy(db)
+    finally:
+        db.close()
+
 @app.get("/")
 def root():
     return {"message": "Welcome to Blot CRM API"}

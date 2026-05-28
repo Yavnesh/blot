@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime, Table
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime, Table, JSON
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.db.base_class import Base
@@ -57,5 +57,8 @@ class Organization(Base):
     key_messages = Column(String, nullable=True)
     competitors = Column(String, nullable=True)
     personalization_enabled = Column(Boolean, default=True)
+    blog_sources = Column(JSON, default=list)
+    instagram_sources = Column(JSON, default=list)
 
     users = relationship("User", secondary=user_organization, back_populates="organizations")
+

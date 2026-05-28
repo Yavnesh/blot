@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.api_v1.endpoints import scrape, twitter_post, trending, post, generation, finetune, seo, analytics, auth, cms, context, token, users, organizations, billing
+from app.api.api_v1.endpoints import scrape, twitter_post, trending, post, generation, finetune, seo, analytics, auth, cms, context, token, users, organizations, billing, taxonomy
 
 api_router = APIRouter()
 api_router.include_router(scrape.router, prefix="/scrapes", tags=["scrapes"])
@@ -18,3 +18,4 @@ api_router.include_router(token.router, prefix="/token", tags=["token"])
 api_router.include_router(users.router, prefix="/users", tags=["users"])
 api_router.include_router(organizations.router, prefix="/organizations", tags=["organizations"])
 api_router.include_router(billing.router, prefix="/billing", tags=["billing"])
+api_router.include_router(taxonomy.router, prefix="/taxonomy", tags=["taxonomy"])

@@ -21,7 +21,8 @@ import {
     Network,
     Terminal,
     ArrowUpRight,
-    Play
+    Play,
+    Instagram
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
@@ -47,32 +48,21 @@ import {
 import api from '../lib/axios';
 import { useOrchestratorStore } from '../store/orchestratorStore';
 import { useAuthStore } from '../store/authStore';
-import OnboardingModal from '../components/OnboardingModal';
 
-const Dashboard = () => {
+const InstagramLedger = () => {
     const navigate = useNavigate();
     const { selectedAssetIds, loadTask } = useOrchestratorStore();
     const [analytics, setAnalytics] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [topicInput, setTopicInput] = useState('');
-    const [contentType, setContentType] = useState('blog');
-    const [isTriggering, setIsTriggering] = useState(false);
     const { user, token } = useAuthStore();
-    const [showOnboarding, setShowOnboarding] = useState(false);
-
-    useEffect(() => {
-        if (user && !user.onboarding_completed) {
-            setShowOnboarding(true);
-        }
-    }, [user]);
 
     const fetchAnalytics = async () => {
         if (!token) return;
         try {
-            const res = await api.get('/analytics/summary');
+            const res = await api.get('/analytics/summary?pipeline_type=instagram');
             setAnalytics(res.data);
         } catch (error) {
-            console.error("Dashboard error:", error);
+            console.error("Instagram Ledger error:", error);
         } finally {
             setLoading(false);
         }
@@ -84,32 +74,11 @@ const Dashboard = () => {
         return () => clearInterval(interval);
     }, [token]);
 
-    const handleTrigger = async (e) => {
-        if (e) e.preventDefault();
-        if (!topicInput.trim()) return;
-        setIsTriggering(true);
-        try {
-            await api.post('/generation/trigger', { 
-                user_topic: topicInput.trim(), 
-                include_images: true, 
-                content_type: contentType,
-                context_document_ids: selectedAssetIds,
-                research_mode: selectedAssetIds.length > 0 ? 'hybrid' : 'web'
-            });
-            setTopicInput('');
-            fetchAnalytics();
-        } catch (err) {
-            console.error(err);
-        } finally {
-            setIsTriggering(false);
-        }
-    };
-
     if (loading) return (
         <div className="flex items-center justify-center min-h-[60vh]">
             <div className="flex flex-col items-center gap-4">
                 <div className="w-12 h-12 border-4 border-white/5 border-t-teal-500 rounded-full animate-spin"></div>
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Syncing Intelligence Matrix...</p>
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Syncing Instagram Ledger Matrix...</p>
             </div>
         </div>
     );
@@ -118,7 +87,6 @@ const Dashboard = () => {
 
     return (
         <div className="w-full max-w-[1720px] mx-auto p-4 md:p-8 lg:p-12 space-y-8 md:space-y-12 pb-32">
-            <OnboardingModal isOpen={showOnboarding} onClose={() => setShowOnboarding(false)} />
             {/* Perspective HUD */}
             <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6">
                 <motion.div 
@@ -126,12 +94,12 @@ const Dashboard = () => {
                     animate={{ opacity: 1, x: 0 }}
                 >
                     <h1 className="text-2xl md:text-3xl font-black tracking-tighter text-white flex items-center gap-3">
-                        <BrainCircuit className="text-teal-400 w-6 h-6 md:w-8 md:h-8" />
-                        Intelligence <span className="text-teal-400">Ledger</span>
+                        <Instagram className="text-teal-400 w-6 h-6 md:w-8 md:h-8" />
+                        Instagram <span className="text-teal-400">Ledger</span>
                     </h1>
                     <p className="text-slate-500 text-[8px] md:text-[10px] font-black uppercase tracking-[0.2em] md:tracking-[0.3em] mt-3 flex items-center gap-2">
                         <span className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-teal-500 animate-pulse shadow-[0_0_8px_rgba(20,184,166,0.5)]"></span>
-                        Blot OS v4.0.0-PRO • Autonomous Swarm Monitor
+                        Blot OS v4.0.0-PRO • Instagram Orchestration Ledger
                     </p>
                 </motion.div>
                 
@@ -143,7 +111,7 @@ const Dashboard = () => {
                     <div className="glass-panel px-4 md:px-6 py-3 md:py-4 flex flex-1 md:flex-none items-center justify-between md:justify-start gap-4 md:gap-8 border border-white/5 bg-slate-900/40">
                         <div className="flex flex-col">
                             <span className="text-[7px] md:text-[8px] font-black uppercase text-slate-500 tracking-[0.2em] mb-1">Global Entity Reach</span>
-                            <span className="text-xs md:text-sm font-black text-white whitespace-nowrap">12.4M Verified Nodes</span>
+                            <span className="text-xs md:text-sm font-black text-white whitespace-nowrap">8.2M Verified Nodes</span>
                         </div>
                         <div className="h-8 md:h-10 w-[1px] bg-white/5" />
                         <div className="flex -space-x-2 md:-space-x-3">
@@ -160,38 +128,38 @@ const Dashboard = () => {
             {/* Performance Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 md:gap-6">
                 <StatCard
-                    title="Discovery Cycles"
+                    title="Research Cycles"
                     value={analytics?.totals?.topics || 0}
-                    change="+12.4%"
+                    change="+15.2%"
                     icon={<Activity className="w-4 h-4 text-teal-400" />}
                     data={analytics?.velocity?.map(v => ({ v: v.topics }))}
                     color="#14b8a6"
                     delay={0.1}
                 />
                 <StatCard
-                    title="Knowledge Extraction"
+                    title="Extracted Insights"
                     value={analytics?.totals?.scrapes || 0}
-                    change="+8.2%"
+                    change="+11.4%"
                     icon={<Database className="w-4 h-4 text-amber-500" />}
                     data={analytics?.velocity?.map(v => ({ v: v.scrapes }))}
                     color="#f59e0b"
                     delay={0.2}
                 />
                 <StatCard
-                    title="Generated Assets"
+                    title="Instagram Campaigns"
                     value={analytics?.totals?.posts || 0}
-                    change="+24.1%"
+                    change="+32.8%"
                     icon={<FileText className="w-4 h-4 text-indigo-400" />}
                     data={analytics?.velocity?.map(v => ({ v: v.posts }))}
                     color="#6366f1"
                     delay={0.3}
                 />
                 <StatCard
-                    title="System Purity"
-                    value="98.2%"
-                    change="+0.4%"
+                    title="Creative Purity"
+                    value="99.1%"
+                    change="+0.6%"
                     icon={<Terminal className="w-4 h-4 text-slate-400" />}
-                    data={analytics?.velocity?.map(v => ({ v: 90 + Math.random() * 8 }))}
+                    data={analytics?.velocity?.map(v => ({ v: 92 + Math.random() * 6 }))}
                     color="#94a3b8"
                     delay={0.4}
                 />
@@ -211,20 +179,20 @@ const Dashboard = () => {
                     </div>
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 mb-10 md:mb-12 relative z-10">
                         <div>
-                            <h3 className="text-lg md:text-xl font-black text-white tracking-widest uppercase italic">Orchestration Throughput</h3>
+                            <h3 className="text-lg md:text-xl font-black text-white tracking-widest uppercase italic">Campaign Generation Throughput</h3>
                             <p className="text-[9px] md:text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] md:tracking-[0.3em] mt-3 flex items-center gap-2">
                                 <span className="w-1.5 h-1.5 rounded-full bg-teal-500/50" />
-                                Multi-Agent Latency Analysis • Real-time
+                                Multi-Agent Carousel & Caption Pacing • Real-time
                             </p>
                         </div>
                         <div className="flex gap-6 md:gap-8">
                             <div className="flex items-center gap-2 md:gap-3">
                                 <div className="w-2 h-2 rounded-full bg-teal-500 shadow-[0_0_8px_rgba(20,184,166,0.6)]"></div>
-                                <span className="text-[8px] md:text-[10px] font-black uppercase text-slate-400 tracking-widest">Discovery</span>
+                                <span className="text-[8px] md:text-[10px] font-black uppercase text-slate-400 tracking-widest">Strategy</span>
                             </div>
                             <div className="flex items-center gap-2 md:gap-3">
                                 <div className="w-2 h-2 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.6)]"></div>
-                                <span className="text-[8px] md:text-[10px] font-black uppercase text-slate-400 tracking-widest">Research</span>
+                                <span className="text-[8px] md:text-[10px] font-black uppercase text-slate-400 tracking-widest">Synthesis</span>
                             </div>
                         </div>
                     </div>
@@ -249,13 +217,13 @@ const Dashboard = () => {
                                     itemStyle={{ color: '#fff', fontSize: '10px' }}
                                 />
                                 <Area type="monotone" dataKey="topics" stroke="#14b8a6" strokeWidth={4} fillOpacity={1} fill="url(#gTeal)" />
-                                <Area type="monotone" dataKey="scrapes" stroke="#f59e0b" strokeWidth={4} fillOpacity={1} fill="url(#gAmber)" />
+                                <Area type="monotone" dataKey="posts" stroke="#f59e0b" strokeWidth={4} fillOpacity={1} fill="url(#gAmber)" />
                             </AreaChart>
                         </ResponsiveContainer>
                     </div>
                 </motion.div>
 
-                {/* Swarm Insight (Replaces Controller) */}
+                {/* Swarm Insight */}
                 <motion.div 
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -263,11 +231,11 @@ const Dashboard = () => {
                     className="lg:col-span-4 glass-panel p-8 md:p-10 border border-white/5 bg-slate-900 shadow-2xl relative overflow-hidden group flex flex-col items-center justify-center text-center"
                 >
                     <div className="w-16 h-16 md:w-20 md:h-20 bg-teal-500/10 rounded-full flex items-center justify-center text-teal-400 mb-6 border border-teal-500/20 shadow-2xl shadow-teal-500/20">
-                        <Cpu size={28} className="animate-pulse" />
+                        <Instagram size={28} className="animate-pulse" />
                     </div>
-                    <h3 className="text-lg md:text-xl font-black text-white tracking-widest uppercase mb-4">Autonomous Mesh</h3>
+                    <h3 className="text-lg md:text-xl font-black text-white tracking-widest uppercase mb-4">Instagram Swarm</h3>
                     <p className="text-slate-500 text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] max-w-[200px] leading-relaxed">
-                        The swarm is monitoring global trends. Trigger new cycles from the Bionic Workspace.
+                        The swarm is monitoring social trends. Trigger new content from the Instagram Workspace.
                     </p>
                 </motion.div>
             </div>
@@ -308,7 +276,7 @@ const Dashboard = () => {
                                     onClick={async () => {
                                         try {
                                             const data = await loadTask(task.task_id);
-                                            const type = data.preview_data?.pipeline_type || task.pipeline_type || 'blog';
+                                            const type = data.preview_data?.pipeline_type || task.pipeline_type || 'instagram';
                                             if (type === 'instagram') {
                                                 navigate('/instagram-workspace');
                                             } else {
@@ -339,7 +307,7 @@ const Dashboard = () => {
                                     <td className="px-6 md:px-10 py-6 md:py-8">
                                         <div className="flex items-center gap-3 md:gap-4">
                                             <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl bg-slate-950 border border-white/5 flex items-center justify-center text-slate-600 group-hover:text-teal-400 transition-colors">
-                                                <Cpu size={16} md:size={18} />
+                                                <Cpu size={16} />
                                             </div>
                                             <div className="flex flex-col">
                                                 <span className="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-widest">{task.current_step || 'Awaiting Cycle'}</span>
@@ -361,13 +329,13 @@ const Dashboard = () => {
                                         </div>
                                     </td>
                                 </tr>
-                            )) : (
+                             )) : (
                                 <tr>
                                     <td colSpan="4" className="px-10 py-20 text-center">
                                         <p className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.3em] text-slate-600">No active process streams detected in vault</p>
                                     </td>
                                 </tr>
-                            )}
+                             )}
                         </tbody>
                     </table>
                 </div>
@@ -418,4 +386,4 @@ const StatCard = ({ title, value, change, icon, data, color, delay }) => {
     );
 };
 
-export default Dashboard;
+export default InstagramLedger;

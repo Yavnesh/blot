@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Book, Zap, Database, Save, Globe, CheckCircle2, AlertTriangle, Terminal, BrainCircuit, Search, ArrowRight, Cpu, Sparkles, Users, Type, Sliders } from 'lucide-react';
+import { 
+    Sparkles, ArrowRight, Cpu, Database, CheckCircle2, 
+    AlertTriangle, Terminal, BrainCircuit, Search, 
+    Instagram, Sliders, Type, Users, Copy, Check, MessageSquare
+} from 'lucide-react';
 import OrchestratorStepper from '../components/OrchestratorStepper';
-import BionicEditor from '../components/BionicEditor';
 import BrandVault from '../components/BrandVault';
 import { useOrchestratorStore } from '../store/orchestratorStore';
 import { usePipelineSocket } from '../lib/socket';
@@ -18,20 +21,24 @@ const Input = React.forwardRef(({ className, ...props }, ref) => {
     );
 });
 
-const BionicWorkspace = () => {
+const InstagramWorkspace = () => {
     const {
         setBrandVaultOpen,
-        uiView,
-        toggleView,
         activePipeline = {},
         approveTask,
         rejectTask,
         triggerPipeline,
-        selectedAssetIds = []
+        selectedAssetIds = [],
+        contentState,
+        updateContent
     } = useOrchestratorStore();
 
     const [topicInput, setTopicInput] = useState('');
     const [debugMode, setDebugMode] = useState(false);
+    const [format, setFormat] = useState('carousel');
+    
+    const [copiedCaption, setCopiedCaption] = useState(false);
+    const [copiedPromptId, setCopiedPromptId] = useState(null);
 
     // Taxonomy States
     const [taxonomyData, setTaxonomyData] = useState([]);
@@ -42,9 +49,6 @@ const BionicWorkspace = () => {
     const [tonePrimary, setTonePrimary] = useState('');
     const [toneSecondaries, setToneSecondaries] = useState([]);
     const [toneSearch, setToneSearch] = useState('');
-
-    // Formatting/Length States
-    const [wordCountTarget, setWordCountTarget] = useState(1000);
 
     // Initialize the WebSocket listener for LangGraph updates
     usePipelineSocket();
@@ -117,10 +121,10 @@ const BionicWorkspace = () => {
     const handleStartGeneration = () => {
         if (!topicInput.trim() || !isTaxonomyValid) return;
         
-        triggerPipeline(topicInput.trim(), 'blog', {
+        triggerPipeline(topicInput.trim(), 'instagram', {
+            instagram_format: format,
             tone: selectedTonePrimaryObj?.name || 'educational',
             audience: selectedAudiencePrimaryObj?.name || 'developers',
-            word_count_target: Number(wordCountTarget),
             target_audience_taxonomy: {
                 category_id: targetAudienceCategory.id,
                 primary_subcategory_id: Number(audiencePrimary),
@@ -135,37 +139,88 @@ const BionicWorkspace = () => {
         setTopicInput('');
     };
 
+    // Parse the draft if it's a JSON string
+    let parsedDraft = null;
+    let parseError = false;
+    if (contentState.draft) {
+        try {
+            parsedDraft = JSON.parse(contentState.draft);
+        } catch (e) {
+            parseError = true;
+        }
+    }
+
+    const handleUpdateSlide = (index, field, value) => {
+        if (!parsedDraft) return;
+        const updatedSlides = [...parsedDraft.slides];
+        updatedSlides[index] = { ...updatedSlides[index], [field]: value };
+        const updatedDraft = { ...parsedDraft, slides: updatedSlides };
+        updateContent(JSON.stringify(updatedDraft));
+    };
+
+    const handleUpdateCaption = (value) => {
+        if (!parsedDraft) return;
+        const updatedDraft = { ...parsedDraft, caption: value };
+        updateContent(JSON.stringify(updatedDraft));
+    };
+
+    const handleUpdateHashtags = (index, value) => {
+        if (!parsedDraft) return;
+        const updatedHashtags = [...parsedDraft.hashtags];
+        updatedHashtags[index] = value;
+        const updatedDraft = { ...parsedDraft, hashtags: updatedHashtags };
+        updateContent(JSON.stringify(updatedDraft));
+    };
+
+    const copyToClipboard = (text, type = 'caption', id = null) => {
+        navigator.clipboard.writeText(text);
+        if (type === 'caption') {
+            setCopiedCaption(true);
+            setTimeout(() => setCopiedCaption(false), 2000);
+        } else if (type === 'prompt') {
+            setCopiedPromptId(id);
+            setTimeout(() => setCopiedPromptId(null), 2000);
+        }
+    };
+
     return (
-        <div className="flex flex-col gap-6 md:gap-8 lg:gap-10 pb-32 max-w-[1600px] mx-auto w-full px-4 md:px-8 lg:px-12">
-            {/* 1. Neural Topic Input (Begin your bionic prose) */}
+        <div className="flex flex-col gap-6 md:gap-8 lg:gap-10 pb-32 max-w-[1600px] mx-auto w-full px-4 md:px-8 lg:px-12 font-sans text-slate-100">
+            {/* 1. Configuration Panel */}
             <div className="glass-panel p-5 md:p-8 lg:p-10 border border-white/5 bg-slate-900/60 relative overflow-hidden group rounded-2xl md:rounded-3xl shadow-2xl">
                 <div className="absolute -top-24 -left-24 w-64 h-64 bg-teal-500/10 blur-[100px] rounded-full pointer-events-none" />
                 <div className="relative z-10">
                     <div className="flex items-center gap-3 mb-6">
-                        <Sparkles className="text-teal-400 w-5 h-5" />
-                        <h2 className="text-[10px] md:text-xs font-black uppercase tracking-[0.3em] text-slate-400">Begin Your Bionic Prose</h2>
+                        <Instagram className="text-teal-400 w-5 h-5" />
+                        <h2 className="text-[10px] md:text-xs font-black uppercase tracking-[0.3em] text-slate-400">Instagram Campaign Builder</h2>
                     </div>
 
                     <div className="flex flex-col gap-6 mb-6">
-                        {/* Length & Formatting Constraints */}
-                        <div className="flex flex-col gap-2 max-w-xl">
+                        {/* Format */}
+                        <div className="flex flex-col gap-2 max-w-md">
                             <label className="text-[9px] font-black uppercase tracking-widest text-slate-500 flex items-center gap-2">
-                                <Sliders size={12} className="text-teal-400" /> Length & Formatting
+                                <Sliders size={12} className="text-teal-400" /> Content Format
                             </label>
-                            <div className="flex flex-wrap gap-2">
-                                {[500, 1000, 1500, 2000].map(words => (
-                                    <button
-                                        key={words}
-                                        onClick={() => setWordCountTarget(words)}
-                                        className={`flex-1 py-3 px-4 rounded-xl font-bold text-[9px] md:text-xs uppercase tracking-widest border transition-all min-w-[120px] ${
-                                            wordCountTarget === words 
-                                                ? 'bg-teal-500/10 border-teal-500/30 text-teal-400' 
-                                                : 'bg-slate-950 border-white/5 text-slate-500 hover:text-slate-300'
-                                        }`}
-                                    >
-                                        {words === 500 ? 'Short (~500w)' : words === 1000 ? 'Standard (~1000w)' : words === 1500 ? 'Long (~1500w)' : 'Deep (~2000w)'}
-                                    </button>
-                                ))}
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => setFormat('carousel')}
+                                    className={`flex-1 py-3 px-4 rounded-xl font-bold text-xs uppercase tracking-widest border transition-all ${
+                                        format === 'carousel' 
+                                            ? 'bg-teal-500/10 border-teal-500/30 text-teal-400' 
+                                            : 'bg-slate-950 border-white/5 text-slate-500 hover:text-slate-300'
+                                    }`}
+                                >
+                                    Carousel (Multi-slide)
+                                </button>
+                                <button
+                                    onClick={() => setFormat('single')}
+                                    className={`flex-1 py-3 px-4 rounded-xl font-bold text-xs uppercase tracking-widest border transition-all ${
+                                        format === 'single' 
+                                            ? 'bg-teal-500/10 border-teal-500/30 text-teal-400' 
+                                            : 'bg-slate-950 border-white/5 text-slate-500 hover:text-slate-300'
+                                    }`}
+                                >
+                                    Single Post
+                                </button>
                             </div>
                         </div>
 
@@ -303,6 +358,7 @@ const BionicWorkspace = () => {
                         </div>
                     </div>
 
+                    {/* Topic Search Input */}
                     <div className="flex flex-col md:flex-row gap-4">
                         <div className="relative flex-1">
                             <Input
@@ -311,10 +367,10 @@ const BionicWorkspace = () => {
                                 onKeyDown={(e) => e.key === 'Enter' && handleStartGeneration()}
                                 placeholder={
                                     isAwaitingApproval
-                                        ? "Enter revision instructions (e.g., 'rewrite intro to be punchy'), then click 'Revise' below..."
+                                        ? "Enter revision instructions (e.g., 'rewrite caption to be punchier'), then click 'Revise' below..."
                                         : isRunning
                                             ? "AI is synthesizing... Please wait."
-                                            : "Enter your editorial topic or target vector (e.g., 'Intro to Agentic RAG')..."
+                                            : "Enter Instagram post topic (e.g., '3 Ways to Optimize Docker Images')..."
                                 }
                                 className="w-full h-14 md:h-16 lg:h-20 bg-slate-950/50 border-white/10 text-white pl-12 md:pl-14 pr-6 rounded-xl md:rounded-2xl focus:ring-2 focus:ring-teal-500/20 text-sm md:text-base lg:text-lg font-bold placeholder:text-slate-600 transition-all"
                             />
@@ -338,37 +394,27 @@ const BionicWorkspace = () => {
                 </div>
             </div>
 
-            {/* 2. Orchestration Matrix (Status & Stepper) */}
+            {/* 2. Stepper Tracker */}
             <div className="space-y-6">
                 <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
                     <div className="flex items-center gap-4 md:gap-5">
                         <div className={`w-10 h-10 md:w-12 md:h-12 rounded-xl flex items-center justify-center shadow-lg transition-colors shrink-0 ${isRunning ? 'bg-teal-500 text-white animate-pulse' : 'bg-slate-800 text-slate-500'}`}>
-                            <Cpu size={20} className="md:size-[22px]" />
+                            <Cpu size={20} />
                         </div>
                         <div className="min-w-0">
                             <h3 className="text-white font-black text-base md:text-lg tracking-tight leading-none mb-2 truncate">
-                                {activePipeline?.topic || "Ready for Synthesis"}
+                                {activePipeline?.topic || "Ready for Instagram Synthesis"}
                             </h3>
                             <div className="flex flex-wrap items-center gap-2 md:gap-3">
                                 <span className={`text-[8px] md:text-[9px] font-black uppercase tracking-widest px-2 py-0.5 md:px-2.5 md:py-1 rounded-md border ${isRunning ? 'bg-teal-500/10 text-teal-400 border-teal-500/20' : 'bg-slate-800 text-slate-600 border-white/5'}`}>
                                     {isRunning ? `${activePipeline?.current_node || 'discovery'} NODE ACTIVE` : 'NEURAL IDLE'}
                                 </span>
-                                <span className="text-[8px] md:text-[9px] font-black text-slate-600 uppercase tracking-widest leading-none whitespace-nowrap">• Consensus Protocol v4</span>
+                                <span className="text-[8px] md:text-[9px] font-black text-slate-600 uppercase tracking-widest leading-none whitespace-nowrap">• Carousel Generator v1.0</span>
                             </div>
                         </div>
                     </div>
 
                     <div className="flex items-center gap-3 w-full md:w-auto">
-                        {(selectedAssetIds || []).length > 0 && (
-                            <motion.div
-                                initial={{ opacity: 0, scale: 0.9 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                className="hidden sm:flex items-center gap-2 h-10 md:h-12 px-3 md:px-4 rounded-lg md:rounded-xl bg-teal-500/10 border border-teal-500/20"
-                            >
-                                <CheckCircle2 className="text-teal-400 w-3 h-3" />
-                                <span className="text-[8px] md:text-[9px] font-black text-teal-400 uppercase tracking-widest">{(selectedAssetIds || []).length} Injected</span>
-                            </motion.div>
-                        )}
                         <button
                             onClick={() => setBrandVaultOpen(true)}
                             className={`flex flex-1 md:flex-none items-center justify-center gap-2 h-10 md:h-12 px-4 md:px-5 rounded-lg md:rounded-xl border transition-all group ${(selectedAssetIds || []).length > 0 ? 'bg-teal-500/10 border-teal-500/20 text-white' : 'bg-slate-900 border-white/5 text-slate-400 hover:text-white'}`}
@@ -386,12 +432,13 @@ const BionicWorkspace = () => {
                 </div>
             </div>
 
-            {/* 3. Logic Stream & Editor Matrix */}
+            {/* 3. Main Split Panel: Logs Stream and Instagram Output */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-10 items-start">
-                {/* Agent Logic Stream (Vertical) */}
-                <div className="lg:col-span-4 space-y-4 md:space-y-6">
+                
+                {/* Left side: Logic Process Stream */}
+                <div className="lg:col-span-4 space-y-4">
                     <div className="flex items-center justify-between px-2">
-                        <h4 className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] md:tracking-[0.3em] text-slate-500">Logic Process Stream</h4>
+                        <h4 className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Logic Process Stream</h4>
                         <button
                             onClick={() => setDebugMode(!debugMode)}
                             className={`flex items-center gap-2 px-3 py-1 rounded-full border transition-all ${debugMode ? 'bg-teal-500/10 border-teal-500/20 text-teal-400' : 'bg-slate-900 border-white/5 text-slate-600'}`}
@@ -401,13 +448,12 @@ const BionicWorkspace = () => {
                         </button>
                     </div>
 
-                    <div className="glass-panel p-4 md:p-6 border border-white/5 bg-slate-900/40 min-h-[300px] md:min-h-[400px] max-h-[500px] md:max-h-[600px] overflow-y-auto space-y-4 md:space-y-6 rounded-xl md:rounded-2xl no-scrollbar custom-scrollbar">
+                    <div className="glass-panel p-4 md:p-6 border border-white/5 bg-slate-900/40 min-h-[300px] md:min-h-[400px] max-h-[500px] md:max-h-[600px] overflow-y-auto space-y-4 md:space-y-6 rounded-xl md:rounded-2xl no-scrollbar custom-scrollbar shadow-xl">
                         <AnimatePresence initial={false}>
                             {(() => {
                                 const displayNode = activePipeline?.selectedNode || activePipeline?.current_node || 'discovery';
                                 const allLogs = activePipeline?.logs?.filter(log => log.step === displayNode) || [];
 
-                                // Filter logs if not in debug mode (hide technical/raw messages)
                                 const filteredLogs = debugMode ? allLogs : allLogs.filter(log => {
                                     const text = (log.text || log.message || "").toLowerCase();
                                     return !text.includes('state update') && !text.includes('raw output') && !text.includes('tokens');
@@ -422,8 +468,8 @@ const BionicWorkspace = () => {
                                             className="flex gap-3 md:gap-4 group"
                                         >
                                             <div className="flex flex-col items-center">
-                                                <div className="w-5 h-5 md:w-6 md:h-6 rounded-md md:rounded-lg bg-teal-500/10 border border-teal-500/20 flex items-center justify-center text-teal-400 group-first:bg-teal-500 group-first:text-white transition-colors">
-                                                    <div className="w-1 md:w-1.5 h-1 md:h-1.5 rounded-full bg-current" />
+                                                <div className="w-5 h-5 rounded-md bg-teal-500/10 border border-teal-500/20 flex items-center justify-center text-teal-400 group-first:bg-teal-500 group-first:text-white transition-colors">
+                                                    <div className="w-1 h-1 rounded-full bg-current" />
                                                 </div>
                                                 {i !== filteredLogs.length - 1 && <div className="w-[1px] h-full bg-white/5 mt-2" />}
                                             </div>
@@ -434,8 +480,8 @@ const BionicWorkspace = () => {
                                         </motion.div>
                                     ))
                                 ) : (
-                                    <div className="h-full flex flex-col items-center justify-center text-center opacity-40 py-16 md:py-20">
-                                        <BrainCircuit size={40} className="md:size-[48px] text-slate-700 mb-4" />
+                                    <div className="h-full flex flex-col items-center justify-center text-center opacity-40 py-16">
+                                        <BrainCircuit size={40} className="text-slate-700 mb-4 animate-pulse" />
                                         <p className="text-[8px] md:text-[10px] font-black uppercase tracking-widest text-slate-600">Awaiting Neural Ignition</p>
                                     </div>
                                 );
@@ -444,34 +490,148 @@ const BionicWorkspace = () => {
                     </div>
                 </div>
 
-                {/* Main Bionic Editor */}
-                <div className="lg:col-span-8 relative">
-                    <AnimatePresence mode="wait">
-                        <motion.div
-                            key="editor"
-                            initial={{ opacity: 0, scale: 0.98 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            transition={{ duration: 0.4 }}
-                        >
-                            <BionicEditor />
-                        </motion.div>
-                    </AnimatePresence>
+                {/* Right side: Generated Content Dashboard */}
+                <div className="lg:col-span-8 space-y-6">
+                    {/* Caption & Carousel Preview */}
+                    {contentState.draft ? (
+                        <>
+                            {parsedDraft ? (
+                                <div className="space-y-6">
+                                    {/* Carousel slides */}
+                                    <div className="flex flex-col gap-4">
+                                        <div className="flex items-center justify-between">
+                                            <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-teal-400">Carousel Slide Deck</h4>
+                                            <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{parsedDraft.slides?.length || 0} Slides Total</span>
+                                        </div>
 
-                    {/* HITL Intervention Component */}
+                                        <div className="flex gap-4 overflow-x-auto pb-4 custom-scrollbar snap-x">
+                                            {parsedDraft.slides?.map((slide, index) => {
+                                                const bgUrl = slide.image_url || `https://picsum.photos/seed/${slide.headline?.replace(/[^a-zA-Z0-9]/g, '') || index}/800/800`;
+                                                return (
+                                                    <div 
+                                                        key={index} 
+                                                        className="snap-start shrink-0 w-80 border border-white/5 rounded-2xl p-5 flex flex-col justify-between h-[360px] relative overflow-hidden shadow-2xl"
+                                                        style={{
+                                                            backgroundImage: `linear-gradient(to bottom, rgba(15, 23, 42, 0.65), rgba(15, 23, 42, 0.95)), url(${bgUrl})`,
+                                                            backgroundSize: 'cover',
+                                                            backgroundPosition: 'center',
+                                                            backgroundColor: '#0f172a'
+                                                        }}
+                                                    >
+                                                        <div className="absolute top-2 right-2 text-slate-800 font-black text-8xl z-0 select-none opacity-20">
+                                                            {slide.slide_number || index + 1}
+                                                        </div>
+
+                                                        <div className="relative z-10 flex flex-col gap-4">
+                                                            <span className="text-[9px] font-black uppercase tracking-widest text-teal-400 bg-teal-500/10 border border-teal-500/20 px-2 py-0.5 rounded w-fit">
+                                                                Slide {slide.slide_number || index + 1}
+                                                            </span>
+                                                            <input
+                                                                type="text"
+                                                                value={slide.headline || ''}
+                                                                onChange={(e) => handleUpdateSlide(index, 'headline', e.target.value)}
+                                                                className="bg-transparent border-b border-transparent hover:border-white/10 focus:border-teal-500 focus:outline-none text-white font-black text-lg tracking-tight leading-snug drop-shadow-[0_2px_8px_rgba(0,0,0,1)] w-full py-1"
+                                                            />
+                                                            <textarea
+                                                                value={slide.body || ''}
+                                                                onChange={(e) => handleUpdateSlide(index, 'body', e.target.value)}
+                                                                rows={3}
+                                                                className="bg-transparent border-b border-transparent hover:border-white/10 focus:border-teal-500 focus:outline-none text-white text-xs leading-relaxed drop-shadow-[0_2px_8px_rgba(0,0,0,1)] w-full resize-none py-1 custom-scrollbar"
+                                                            />
+                                                        </div>
+
+                                                        <div className="relative z-10 pt-4 border-t border-white/5 flex flex-col gap-2">
+                                                            <span className="text-[8px] font-black uppercase tracking-widest text-slate-500 flex items-center justify-between">
+                                                                Visual AI Prompt
+                                                                <button 
+                                                                    onClick={() => copyToClipboard(slide.image_prompt, 'prompt', index)}
+                                                                    className="text-teal-400 hover:text-white transition-colors"
+                                                                >
+                                                                    {copiedPromptId === index ? <Check size={10} /> : <Copy size={10} />}
+                                                                </button>
+                                                            </span>
+                                                            <textarea
+                                                                value={slide.image_prompt || ''}
+                                                                onChange={(e) => handleUpdateSlide(index, 'image_prompt', e.target.value)}
+                                                                rows={2}
+                                                                className="bg-slate-950/60 border border-white/5 hover:border-white/10 focus:border-teal-500 focus:outline-none text-[9px] font-mono text-slate-405 p-1.5 rounded-lg w-full resize-none leading-relaxed custom-scrollbar"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+
+                                    {/* Caption & Hashtags */}
+                                    <div className="glass-panel p-6 border border-white/5 bg-slate-900/40 rounded-2xl flex flex-col gap-4 shadow-xl">
+                                        <div className="flex items-center justify-between border-b border-white/5 pb-4">
+                                            <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-teal-400 flex items-center gap-2">
+                                                <MessageSquare size={14} /> Synthesized Caption
+                                            </h4>
+                                            <button
+                                                onClick={() => copyToClipboard(parsedDraft.caption, 'caption')}
+                                                className="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 px-4 py-2 rounded-xl transition-all border border-teal-500/20"
+                                            >
+                                                {copiedCaption ? <Check size={12} /> : <Copy size={12} />}
+                                                {copiedCaption ? 'Copied' : 'Copy Caption'}
+                                            </button>
+                                        </div>
+
+                                        <textarea
+                                            value={parsedDraft.caption || ''}
+                                            onChange={(e) => handleUpdateCaption(e.target.value)}
+                                            rows={8}
+                                            className="bg-slate-950/60 border border-white/5 hover:border-white/10 focus:border-teal-500 focus:outline-none text-slate-300 text-xs md:text-sm font-medium p-4 rounded-2xl w-full leading-relaxed resize-y custom-scrollbar"
+                                        />
+
+                                        <div className="flex flex-wrap gap-2 pt-4 border-t border-white/5">
+                                            {parsedDraft.hashtags?.map((tag, tagIndex) => (
+                                                <input
+                                                    key={tagIndex}
+                                                    type="text"
+                                                    value={tag}
+                                                    onChange={(e) => handleUpdateHashtags(tagIndex, e.target.value)}
+                                                    className="text-[9px] font-black text-slate-400 uppercase tracking-widest bg-slate-950 border border-white/5 focus:border-teal-500/50 focus:outline-none px-2.5 py-1.5 rounded-lg w-28 text-center transition-all"
+                                                />
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="glass-panel p-6 border border-white/5 bg-slate-900/40 rounded-2xl">
+                                    <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-500 mb-4">Raw Draft Pipeline Output</h4>
+                                    <pre className="text-xs text-slate-400 font-mono bg-slate-950 p-4 rounded-xl overflow-x-auto whitespace-pre-wrap leading-relaxed max-h-[600px] border border-white/5">
+                                        {contentState.draft}
+                                    </pre>
+                                </div>
+                            )}
+                        </>
+                    ) : (
+                        <div className="glass-panel p-10 border border-white/5 bg-slate-900/20 backdrop-blur-md rounded-2xl flex flex-col items-center justify-center text-center min-h-[400px] shadow-xl">
+                            <Instagram size={48} className="text-slate-700 mb-4 animate-pulse" />
+                            <h4 className="text-white font-black text-lg tracking-tight uppercase mb-2">No Campaign Synthesized</h4>
+                            <p className="text-slate-500 text-xs max-w-md font-medium leading-relaxed">
+                                Enter your target topic, select the preferred format, tone and target demographic, then ignite the autonomous agent pipeline to generate post copies and visuals.
+                            </p>
+                        </div>
+                    )}
+
+                    {/* Quality Gate / HITL Intervention */}
                     <AnimatePresence>
                         {isAwaitingApproval && (
                             <motion.div
                                 initial={{ opacity: 0, y: 50 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, y: 50 }}
-                                className="bg-amber-500 rounded-2xl md:rounded-[2.5rem] p-6 md:p-10 mt-6 md:mt-10 flex flex-col md:flex-row items-center justify-between shadow-2xl shadow-amber-500/20 border border-white/20 relative overflow-hidden"
+                                className="bg-amber-500 rounded-2xl md:rounded-[2.5rem] p-6 md:p-10 flex flex-col md:flex-row items-center justify-between shadow-2xl border border-white/20 relative overflow-hidden"
                             >
                                 <div className="absolute top-0 right-0 p-6 md:p-8 opacity-10 pointer-events-none">
-                                    <AlertTriangle size={80} className="md:size-[120px]" />
+                                    <AlertTriangle size={80} />
                                 </div>
                                 <div className="flex items-center gap-4 md:gap-6 relative z-10 w-full md:w-auto">
                                     <div className="w-12 h-12 md:w-16 md:h-16 bg-slate-950 rounded-xl md:rounded-2xl flex items-center justify-center text-amber-500 shadow-xl flex-shrink-0">
-                                        <AlertTriangle size={20} className="md:size-[24px]" />
+                                        <AlertTriangle size={20} />
                                     </div>
                                     <div>
                                         <h3 className="text-slate-950 font-black text-base md:text-2xl tracking-tighter mb-1">Quality Gate Active</h3>
@@ -485,16 +645,16 @@ const BionicWorkspace = () => {
                                             rejectTask(activePipeline?.job_id, topicInput.trim() || "Needs revision");
                                             setTopicInput('');
                                         }}
-                                        className="flex-1 md:flex-none px-5 md:px-6 py-3 md:py-4 bg-slate-950/10 border border-slate-950/20 text-slate-950 text-[8px] md:text-[10px] font-black uppercase tracking-[0.2em] rounded-lg md:rounded-xl hover:bg-slate-950/20 transition-all active:scale-95"
+                                        className="flex-1 md:flex-none px-5 md:px-6 py-3 md:py-4 bg-slate-950/10 border border-slate-950/20 text-slate-950 text-[8px] md:text-[10px] font-black uppercase tracking-[0.2em] rounded-lg md:rounded-xl hover:bg-slate-950/20 transition-all active:scale-95 font-bold"
                                     >
                                         Revise
                                     </button>
                                     <button
                                         onClick={() => approveTask(activePipeline?.job_id)}
-                                        className="flex-1 md:flex-none px-6 md:px-8 py-3 md:py-4 bg-slate-950 text-white text-[8px] md:text-[10px] font-black uppercase tracking-[0.2em] rounded-lg md:rounded-xl hover:scale-105 transition-all flex items-center justify-center gap-2 md:gap-3 shadow-2xl active:scale-95"
+                                        className="flex-1 md:flex-none px-6 md:px-8 py-3 md:py-4 bg-slate-950 text-white text-[8px] md:text-[10px] font-black uppercase tracking-[0.2em] rounded-lg md:rounded-xl hover:scale-105 transition-all flex items-center justify-center gap-2 md:gap-3 shadow-2xl active:scale-95 font-bold"
                                     >
-                                        <CheckCircle2 size={14} className="md:size-[16px]" />
-                                        Approve
+                                        <CheckCircle2 size={14} />
+                                        Approve Campaign
                                     </button>
                                 </div>
                             </motion.div>
@@ -508,4 +668,4 @@ const BionicWorkspace = () => {
     );
 };
 
-export default BionicWorkspace;
+export default InstagramWorkspace;

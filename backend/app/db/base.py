@@ -13,3 +13,4 @@ from app.models.credit import CreditLedger
 from app.models.trust_source import TrustSource
 from app.models.correction import CorrectionLog
 from app.models.rag import WorkspaceAsset, AssetEmbedding
+from app.models.taxonomy import Category, PrimarySubcategory, SecondarySubcategory, PostTaxonomy

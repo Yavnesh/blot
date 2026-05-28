@@ -6,9 +6,9 @@ from app.agents.strategy.intent_agent import IntentAgent
 
 async def strategy_node(state: ArticleState) -> Dict[str, Any]:
     """
-    Generates SEO keyword clusters and a structured SERP blueprint.
+    Generates SEO keyword clusters and a structured SERP blueprint or Instagram strategy.
     """
-    logger.info(f"LangGraph [Strategy]: Building SEO Blueprint for '{state['resolved_topic']}'")
+    logger.info(f"LangGraph [Strategy]: Building Strategy for '{state['resolved_topic']}' ({state.get('pipeline_type', 'blog')})")
     
     if not state.get("serp_data"):
         return {
@@ -16,8 +16,34 @@ async def strategy_node(state: ArticleState) -> Dict[str, Any]:
             "logs": ["No research data available for strategy development. Skipping."]
         }
         
+    if state.get("pipeline_type") == "instagram":
+        from app.agents.strategy.instagram_strategy_agent import InstagramStrategyAgent
+        agent = InstagramStrategyAgent()
+        result = await agent.run({
+            "topic": state["resolved_topic"],
+            "verified_research": state.get("serp_data", []),
+            "tone": state.get("tone", "educational"),
+            "audience": state.get("audience", "developers"),
+            "instagram_format": state.get("instagram_format", "carousel"),
+            "target_audience_taxonomy": state.get("target_audience_taxonomy"),
+            "editorial_tone_taxonomy": state.get("editorial_tone_taxonomy")
+        })
+        if result.status != "success":
+            return {"logs": [f"Instagram strategy formulation failed: {result.feedback}"]}
+        
+        strat_data = result.data.get("strategy", {})
+        return {
+            "brand_voice_prompt": strat_data.get("visual_style"),
+            "serp_blueprint": strat_data,
+            "logs": [
+                f"Instagram Strategy established. Angle: '{strat_data.get('angle')}'",
+                f"Hook: '{strat_data.get('hook')}'"
+            ]
+        }
+
     # 1. Keyword Clustering
     cluster_agent = KeywordClusterAgent()
+
     cluster_result = await cluster_agent.run({
         "topic": state["resolved_topic"],
         "verified_research": state.get("serp_data", [])

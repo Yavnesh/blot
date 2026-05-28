@@ -19,9 +19,15 @@ def read_posts(
     db: Session = Depends(deps.get_db),
     skip: int = 0,
     limit: int = 100,
+    pipeline_type: Optional[str] = None,
     current_org: Organization = Depends(deps.get_current_active_org)
 ) -> Any:
-    posts = db.query(Post).filter(Post.org_id == current_org.id).order_by(Post.created_at.desc()).offset(skip).limit(limit).all()
+    query = db.query(Post).filter(Post.org_id == current_org.id)
+    if pipeline_type == "instagram":
+        query = query.filter(Post.pub_platform == "instagram")
+    elif pipeline_type == "blog":
+        query = query.filter(Post.pub_platform != "instagram")
+    posts = query.order_by(Post.created_at.desc()).offset(skip).limit(limit).all()
     return posts
 
 @router.post("/", response_model=PostSchema)
@@ -165,7 +171,7 @@ def confirm_rerun(
     # Update telemetry log for this agent
     logs = list(post.agent_telemetry) if post.agent_telemetry else []
     for log in logs:
-        if log.get("agent_name") == agent_key:
+        if isinstance(log, dict) and log.get("agent_name") == agent_key:
             log["status"] = "success"
             log["confidence_score"] = new_data.get("confidence_score") or new_data.get("seo_score") or new_data.get("score") or 0.0
             break

@@ -10,6 +10,12 @@ async def evaluation_node(state: ArticleState) -> Dict[str, Any]:
     """
     logger.info(f"LangGraph [Evaluation]: Assessing final article for Job {state['job_id']}")
     
+    if state.get("pipeline_type") == "instagram":
+        return {
+            "is_approved": True,
+            "logs": ["Instagram post automatically approved by evaluation gate."]
+        }
+        
     content = state.get("current_draft")
     if not content:
         # If no draft, we should probably stop or it will loop forever.

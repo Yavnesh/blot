@@ -29,36 +29,41 @@ class ImageAgent(BaseAgent):
         images_data = []
         import random 
         
+        from app.core.config import settings
+        
         # Prepare an image core prompt
         base_prompt = f"High quality cinematic illustration representing {topic}"
         if input_data.get("seo_data") and input_data.get("seo_data").get("focus_keyword"):
             base_prompt += f", focusing on {input_data['seo_data']['focus_keyword']}"
             
-        if provider == "horde":
+        if provider == "horde" and settings.STABLE_HORDE_API_KEY:
             logger.info("Invoking Stable Horde for image generation...")
-            # Generate 1 primary cover image
             crm_path, fp, b64, censored = await horde_client.generate_image_api(base_prompt, post_id, input_data.get("url_slug", topic.replace(" ", "-").lower()))
             if crm_path:
                 images_data.append({
                     "prompt": base_prompt,
                     "alt_text": f"A representation of {topic}",
-                    "crm_path": crm_path,
+                    "crm_path": f"http://localhost:8080/{crm_path}" if not crm_path.startswith("http") else crm_path,
                     "file_path": fp
                 })
-        else:
-            logger.info("Invoking Google API for image generation (Mock / Fallback)")
-            # Generate random images using Picsum / Default handling
+        
+        # Fallback / Default: Generate real context-relatable images via Pollinations.ai
+        if not images_data:
+            logger.info("Invoking Pollinations.ai for high-quality free image generation...")
             for i in range(1, 4):
-                width = random.choice([800])  # 1200, 1000, 800
-                height = random.choice([400]) # 600, 500, 400
-                rand_id = random.randint(1, 1000)
-                url = f"https://picsum.photos/id/{rand_id}/{width}/{height}"
-                images_data.append({
-                    "prompt": f"Generated via Google API {i}",
-                    "alt_text": f"A representation of {topic}",
-                    "crm_path": url,
-                    "file_path": url
-                })
+                variation_prompt = f"{base_prompt}, detailed viewpoint variation {i}"
+                crm_path, fp, b64, censored = await horde_client.generate_image_pollinations(
+                    variation_prompt, 
+                    post_id, 
+                    f"{input_data.get('url_slug', topic.replace(' ', '-').lower())}_{i}"
+                )
+                if crm_path:
+                    images_data.append({
+                        "prompt": variation_prompt,
+                        "alt_text": f"A representation of {topic} (Visual Aspect {i})",
+                        "crm_path": f"http://localhost:8080/{crm_path}" if not crm_path.startswith("http") else crm_path,
+                        "file_path": fp
+                    })
         
         # We always return success so the pipeline is not halted by image failure
         return AgentOutput(

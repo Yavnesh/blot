@@ -1,6 +1,6 @@
 
-from typing import Any, List, Dict
-from fastapi import APIRouter, Depends
+from typing import Any, List, Dict, Optional
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from datetime import datetime, timedelta
@@ -17,6 +17,7 @@ router = APIRouter()
 @router.get("/summary", response_model=Dict[str, Any])
 def get_dashboard_analytics(
     db: Session = Depends(deps.get_db),
+    pipeline_type: Optional[str] = Query(None, description="Filter by pipeline type ('blog' or 'instagram')"),
     current_org: Organization = Depends(deps.get_current_active_org),
 ) -> Any:
     """
@@ -41,7 +42,15 @@ def get_dashboard_analytics(
 
     topics_daily = get_daily_counts(Trending)
     scrapes_daily = {}  # Scrape model has no created_at field
-    posts_daily = get_daily_counts(Post, Post.org_id == current_org.id)
+    
+    if pipeline_type == 'instagram':
+        posts_filter = (Post.org_id == current_org.id) & (Post.pub_platform == 'instagram')
+    elif pipeline_type == 'blog':
+        posts_filter = (Post.org_id == current_org.id) & (Post.pub_platform != 'instagram')
+    else:
+        posts_filter = Post.org_id == current_org.id
+
+    posts_daily = get_daily_counts(Post, posts_filter)
     
     # Fill gaps for the chart
     velocity = []
@@ -57,7 +66,12 @@ def get_dashboard_analytics(
 
     # 2. Agent Performance Analytics
     # We aggregate data from TaskProgress logs
-    all_tasks = db.query(TaskProgress).filter(TaskProgress.status == "completed").all()
+    tasks_query = db.query(TaskProgress).filter(TaskProgress.status == "completed").all()
+    if pipeline_type:
+        all_tasks = [t for t in tasks_query if (t.preview_data or {}).get("pipeline_type", "blog") == pipeline_type]
+    else:
+        all_tasks = tasks_query
+        
     agent_stats = {}
     total_cost = 0.0
     total_tokens = 0
@@ -65,6 +79,8 @@ def get_dashboard_analytics(
     for task in all_tasks:
         logs = task.logs or []
         for log in logs:
+            if not isinstance(log, dict):
+                continue
             agent = log.get("agent_name", "unknown")
             if agent not in agent_stats:
                 agent_stats[agent] = {"success": 0, "total": 0, "total_score": 0.0, "count_score": 0}
@@ -93,7 +109,14 @@ def get_dashboard_analytics(
         })
 
     # 3. Content SEO Distribution — scoped to org
-    posts = db.query(Post).filter(Post.org_id == current_org.id).all()
+    post_query = db.query(Post).filter(Post.org_id == current_org.id)
+    if pipeline_type == 'instagram':
+        posts = post_query.filter(Post.pub_platform == 'instagram').all()
+    elif pipeline_type == 'blog':
+        posts = post_query.filter(Post.pub_platform != 'instagram').all()
+    else:
+        posts = post_query.all()
+        
     seo_dist = {"Excellent": 0, "Good": 0, "Average": 0, "Poor": 0}
     for p in posts:
         score = p.seo_data.get("score", 0) if p.seo_data else 0
@@ -101,6 +124,16 @@ def get_dashboard_analytics(
         elif score >= 75: seo_dist["Good"] += 1
         elif score >= 50: seo_dist["Average"] += 1
         else: seo_dist["Poor"] += 1
+
+    # Filter recent tasks
+    recent_tasks_query = db.query(TaskProgress).filter(TaskProgress.org_id == current_org.id).order_by(TaskProgress.updated_at.desc()).all()
+    if pipeline_type:
+        recent_tasks = [
+            t for t in recent_tasks_query 
+            if (t.preview_data or {}).get("pipeline_type", "blog") == pipeline_type
+        ][:10]
+    else:
+        recent_tasks = recent_tasks_query[:10]
 
     return {
         "velocity": velocity,
@@ -135,10 +168,12 @@ def get_dashboard_analytics(
         },
         "recent_tasks": [
             {
+                "task_id": t.task_id,
                 "topic": t.topic,
                 "status": t.status,
                 "current_step": t.current_step,
+                "pipeline_type": (t.preview_data or {}).get("pipeline_type", "blog"),
                 "updated_at": t.updated_at.isoformat() if t.updated_at else None
-            } for t in db.query(TaskProgress).order_by(TaskProgress.updated_at.desc()).limit(10).all()
+            } for t in recent_tasks
         ]
     }

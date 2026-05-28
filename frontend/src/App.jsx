@@ -15,6 +15,8 @@ import BionicWorkspace from './pages/BionicWorkspace';
 import Settings from './pages/Settings';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
+import InstagramWorkspace from './pages/InstagramWorkspace';
+import InstagramLedger from './pages/InstagramLedger';
 
 // Simple Route Protection Component
 function PrivateWrapper({ children }) {
@@ -28,6 +30,10 @@ function PrivateWrapper({ children }) {
       fetchMe();
     }
   }, [token, user, fetchMe, navigate, isLoadingUser]);
+
+  if (!token) {
+    return <Navigate to="/login" replace />;
+  }
 
   if (token && (!user || isLoadingUser)) {
     return (
@@ -60,6 +66,8 @@ function App() {
           
           <Route path="/ledger" element={<PrivateWrapper><Dashboard /></PrivateWrapper>} />
           <Route path="/workspace" element={<PrivateWrapper><BionicWorkspace /></PrivateWrapper>} />
+          <Route path="/instagram-workspace" element={<PrivateWrapper><InstagramWorkspace /></PrivateWrapper>} />
+          <Route path="/instagram-ledger" element={<PrivateWrapper><InstagramLedger /></PrivateWrapper>} />
           <Route path="/topics" element={<PrivateWrapper><Topics /></PrivateWrapper>} />
           <Route path="/scrape" element={<PrivateWrapper><Scrapes /></PrivateWrapper>} />
           <Route path="/posts" element={<PrivateWrapper><Posts /></PrivateWrapper>} />

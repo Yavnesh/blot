@@ -75,43 +75,56 @@ const ArticlePreview = ({ post, onBack, onUpdate }) => {
     // Clean content parsing for premium preview experience
     const rawContent = post.content?.[0] || post.content || '';
 
+    const isInstagram = post.pub_platform === 'instagram';
+    let instagramData = null;
+    if (isInstagram && rawContent) {
+        try {
+            instagramData = JSON.parse(rawContent);
+        } catch (e) {
+            console.error("Failed to parse Instagram content JSON", e);
+        }
+    }
+
     // Better regex for metadata markers
-    const titleMatch = rawContent.match(/\*{0,3}\s*Title:\s*\*{0,3}\s*([^\n]+)/i)
-    const metaMatch = rawContent.match(/\*{0,3}\s*Meta Description:\s*\*{0,3}\s*([^\n]+)/i)
+    const titleMatch = !isInstagram ? rawContent.match(/\*{0,3}\s*Title:\s*\*{0,3}\s*([^\n]+)/i) : null;
+    const metaMatch = !isInstagram ? rawContent.match(/\*{0,3}\s*Meta Description:\s*\*{0,3}\s*([^\n]+)/i) : null;
 
     let embeddedTitle = titleMatch ? titleMatch[1].trim() : null;
     let embeddedMeta = metaMatch ? metaMatch[1].trim() : null;
 
     // Fallback: If no "Title:" marker, use the first H1 (# Title)
-    if (!embeddedTitle) {
+    if (!embeddedTitle && !isInstagram) {
         const h1Match = rawContent.match(/^#{1}\s+([^\n]+)/m);
         if (h1Match) embeddedTitle = h1Match[1].trim();
     }
 
-    const displayTitle = (embeddedTitle || post.title?.[0] || 'Untitled Article').replace(/^#+\s*/, '');
-    const displayMeta = embeddedMeta || post.seo_data?.meta_description || 'Expertly synthesized intelligence into actionable content.';
+    const displayTitle = (isInstagram ? (post.title?.[0] || 'Instagram Post') : (embeddedTitle || post.title?.[0] || 'Untitled Article')).replace(/^#+\s*/, '');
+    const displayMeta = isInstagram ? 'Synthesized multi-slide Instagram carousel campaign.' : (embeddedMeta || post.seo_data?.meta_description || 'Expertly synthesized intelligence into actionable content.');
 
     // Clean the body for rendering
-    let cleanContent = rawContent
-        .replace(/\*{0,3}\s*Title:\s*\*{0,3}\s*[^\n]+\n?/gi, '')
-        .replace(/\*{0,3}\s*Meta Description:\s*\*{0,3}\s*[^\n]+\n?/gi, '')
-        .replace(/\*{0,3}\s*URL Slug:\s*\*{0,3}\s*[^\n]+\n?/gi, '')
-        .replace(/^---+\s*\n?/gm, '')
-        .replace(/^\*+\s*\n?/gm, '')
-        .replace(/^#+\s*H\d:\s*/gim, '# ')
-        // Strip common AI preamble sentences
-        .replace(/^(This refined version|This refined draft|This version|This article|This draft|This content|The following draft|Here is the|I have updated|I have refined).{0,120}(voice|tone|audience|flow|narrative|SEO|keyword|expert|deep-dive|brand|draft|article|style|instruction).{0,60}[:.]\s*\n?/gim, '')
-        .replace(/^\s+/, '');
+    let cleanContent = '';
+    if (!isInstagram) {
+        cleanContent = rawContent
+            .replace(/\*{0,3}\s*Title:\s*\*{0,3}\s*[^\n]+\n?/gi, '')
+            .replace(/\*{0,3}\s*Meta Description:\s*\*{0,3}\s*[^\n]+\n?/gi, '')
+            .replace(/\*{0,3}\s*URL Slug:\s*\*{0,3}\s*[^\n]+\n?/gi, '')
+            .replace(/^---+\s*\n?/gm, '')
+            .replace(/^\*+\s*\n?/gm, '')
+            .replace(/^#+\s*H\d:\s*/gim, '# ')
+            // Strip common AI preamble sentences
+            .replace(/^(This refined version|This refined draft|This version|This article|This draft|This content|The following draft|Here is the|I have updated|I have refined).{0,120}(voice|tone|audience|flow|narrative|SEO|keyword|expert|deep-dive|brand|draft|article|style|instruction).{0,60}[:.]\s*\n?/gim, '')
+            .replace(/^\s+/, '');
 
-    // Handle redundant titles at the top
-    if (embeddedTitle) {
-        const titleEscaped = embeddedTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-        // Strip H1, H2, or Bold title if it's the first thing in the content
-        const redundantTitleRegex = new RegExp(`^(#+\\s*|\\*{1,3}\\s*)${titleEscaped}(\\s*\\*{1,3})?\\s*\\n?`, 'i')
-        cleanContent = cleanContent.replace(redundantTitleRegex, '').trim()
+        // Handle redundant titles at the top
+        if (embeddedTitle) {
+            const titleEscaped = embeddedTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+            // Strip H1, H2, or Bold title if it's the first thing in the content
+            const redundantTitleRegex = new RegExp(`^(#+\\s*|\\*{1,3}\\s*)${titleEscaped}(\\s*\\*{1,3})?\\s*\\n?`, 'i')
+            cleanContent = cleanContent.replace(redundantTitleRegex, '').trim()
+        }
+
+        cleanContent = cleanContent.replace(/^(\*+\s*)+/, '').trim();
     }
-
-    cleanContent = cleanContent.replace(/^(\*+\s*)+/, '').trim();
 
     const telemetry = post.agent_telemetry || [];
 
@@ -163,7 +176,7 @@ const ArticlePreview = ({ post, onBack, onUpdate }) => {
                     <div className="w-full lg:w-3/5">
                         <div className="inline-flex items-center gap-3 md:gap-4 bg-white/5 border border-white/5 px-4 py-1.5 md:px-6 md:py-2 rounded-full mb-6 md:mb-10">
                             <span className="text-teal-400 text-[8px] md:text-[10px] font-black uppercase tracking-[0.2em] md:tracking-[0.3em]">
-                                {post.seo_data?.schema_type || 'Bionic Article'}
+                                {isInstagram ? 'Instagram Carousel' : (post.seo_data?.schema_type || 'Bionic Article')}
                             </span>
                             <div className="w-[1px] h-3 bg-white/10"></div>
                             <span className="text-slate-500 text-[7px] md:text-[9px] font-black uppercase tracking-widest">
@@ -181,7 +194,13 @@ const ArticlePreview = ({ post, onBack, onUpdate }) => {
 
                         <div className="flex flex-wrap gap-2 md:gap-3">
                             {post.tags && (Array.isArray(post.tags) ? post.tags : [post.tags]).map(tag => (
-                                <span key={tag} className="text-[7px] md:text-[10px] font-black text-slate-500 uppercase tracking-widest bg-slate-900 border border-white/5 px-3 py-1.5 md:px-4 md:py-2 rounded-lg md:rounded-xl hover:text-teal-400 hover:border-teal-400/30 transition-all cursor-crosshair">
+                                <span key={tag} className="text-[7px] md:text-[10px] font-black text-slate-500 uppercase tracking-widest bg-slate-900 border border-white/5 px-3 py-1.5 md:px-4 md:py-2 rounded-lg md:rounded-xl hover:text-teal-400 hover:border-teal-400/30 transition-all cursor-crosshair"
+                                    onClick={() => {
+                                        const cleanTag = tag.startsWith('#') ? tag : `#${tag}`;
+                                        navigator.clipboard.writeText(cleanTag);
+                                        alert(`Copied ${cleanTag}`);
+                                    }}
+                                >
                                     {tag.startsWith('#') ? tag : `#${tag}`}
                                 </span>
                             ))}
@@ -198,6 +217,11 @@ const ArticlePreview = ({ post, onBack, onUpdate }) => {
                                 />
                                 <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent opacity-60"></div>
                             </div>
+                        ) : isInstagram ? (
+                            <div className="aspect-video lg:aspect-square bg-slate-900 rounded-2xl md:rounded-[3rem] border border-white/5 flex flex-col items-center justify-center gap-4 md:gap-6 text-teal-400/50">
+                                <span className="material-icons text-5xl md:text-7xl">photo_library</span>
+                                <span className="text-[8px] md:text-[10px] font-black uppercase tracking-widest">Instagram Slide Assets</span>
+                            </div>
                         ) : (
                             <div className="aspect-video lg:aspect-square bg-slate-900 rounded-2xl md:rounded-[3rem] border-2 border-dashed border-white/5 flex flex-col items-center justify-center gap-4 md:gap-6 text-slate-700">
                                 <span className="material-icons text-4xl md:text-6xl">landscape</span>
@@ -210,26 +234,131 @@ const ArticlePreview = ({ post, onBack, onUpdate }) => {
                 <div className="flex flex-col lg:flex-row gap-12 md:gap-24 border-t border-white/5 pt-16 md:pt-24">
                     {/* Primary Intelligence Core */}
                     <article className="w-full lg:w-2/3">
-                        <div className="prose prose-invert prose-teal max-w-none">
-                            <ReactMarkdown
-                                remarkPlugins={[remarkGfm]}
-                                components={{
-                                    h1: ({ node, ...props }) => <h1 className="text-3xl md:text-5xl font-black text-white mt-12 md:mt-20 mb-6 md:mb-10 tracking-tighter uppercase" {...props} />,
-                                    h2: ({ node, ...props }) => <h2 className="text-2xl md:text-3xl font-black text-white mt-10 md:mt-16 mb-4 md:mb-8 tracking-tight border-b border-white/5 pb-4 md:pb-6 uppercase" {...props} />,
-                                    h3: ({ node, ...props }) => <h3 className="text-lg md:text-xl font-black text-teal-400 mt-8 md:mt-12 mb-4 md:mb-6 tracking-widest uppercase" {...props} />,
-                                    p: ({ node, ...props }) => <p className="text-slate-400 text-base md:text-lg leading-[1.8] mb-6 md:mb-10 font-medium tracking-wide" {...props} />,
-                                    li: ({ node, ...props }) => <li className="text-slate-400 text-base md:text-lg leading-relaxed mb-4 md:mb-6 list-none relative pl-8 before:content-[''] before:absolute before:left-0 before:top-2.5 md:before:top-3 before:w-2 before:h-2 before:bg-teal-500 before:rounded-full before:shadow-[0_0_10px_rgba(20,184,166,0.5)]" {...props} />,
-                                    blockquote: ({ node, ...props }) => (
-                                        <div className="bg-slate-900/50 border-l-4 border-indigo-500 p-8 md:p-12 my-10 md:my-14 rounded-2xl md:rounded-3xl italic text-slate-200 text-lg md:text-xl font-bold tracking-tight shadow-2xl relative overflow-hidden" {...props}>
-                                            <span className="material-icons absolute top-4 left-4 text-white/5 text-6xl md:text-8xl pointer-events-none">format_quote</span>
-                                            <div className="relative z-10">{props.children}</div>
-                                        </div>
-                                    )
-                                }}
-                            >
-                                {cleanContent}
-                            </ReactMarkdown>
-                        </div>
+                        {isInstagram && instagramData ? (
+                            <div className="space-y-12">
+                                {/* Carousel slides */}
+                                <div className="flex flex-col gap-6">
+                                    <div className="flex items-center justify-between border-b border-white/5 pb-4">
+                                        <h3 className="text-xl md:text-2xl font-black text-white uppercase tracking-tight">Carousel Slide Deck</h3>
+                                        <span className="text-[10px] font-black text-teal-400 uppercase tracking-widest bg-teal-500/10 border border-teal-500/20 px-3 py-1 rounded-full">
+                                            {instagramData.slides?.length || 0} Slides
+                                        </span>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        {instagramData.slides?.map((slide, index) => {
+                                            const bgUrl = slide.image_url || `https://picsum.photos/seed/${slide.headline?.replace(/[^a-zA-Z0-9]/g, '') || index}/800/800`;
+                                            return (
+                                                <div 
+                                                    key={index} 
+                                                    className="border border-white/5 rounded-3xl p-6 flex flex-col justify-between h-[360px] relative overflow-hidden shadow-2xl hover:border-teal-400/30 transition-all duration-300 group"
+                                                    style={{
+                                                        backgroundImage: `linear-gradient(to bottom, rgba(15, 23, 42, 0.65), rgba(15, 23, 42, 0.95)), url(${bgUrl})`,
+                                                        backgroundSize: 'cover',
+                                                        backgroundPosition: 'center',
+                                                        backgroundColor: '#0f172a'
+                                                    }}
+                                                >
+                                                    <div className="absolute top-2 right-2 text-slate-800 font-black text-8xl z-0 select-none opacity-20 group-hover:scale-110 transition-transform duration-500">
+                                                        {slide.slide_number || index + 1}
+                                                    </div>
+
+                                                    <div className="relative z-10 flex flex-col gap-4">
+                                                        <span className="text-[9px] font-black uppercase tracking-widest text-teal-400 bg-teal-500/10 border border-teal-500/20 px-2 py-0.5 rounded w-fit">
+                                                            Slide {slide.slide_number || index + 1}
+                                                        </span>
+                                                        <h5 className="text-white font-black text-2xl tracking-tight leading-snug drop-shadow-[0_2px_8px_rgba(0,0,0,1)]">
+                                                            {slide.headline}
+                                                        </h5>
+                                                        <p className="text-white text-sm font-black leading-relaxed drop-shadow-[0_2px_8px_rgba(0,0,0,1)]">
+                                                            {slide.body}
+                                                        </p>
+                                                    </div>
+
+                                                    <div className="relative z-10 pt-4 border-t border-white/5 flex flex-col gap-2">
+                                                        <span className="text-[8px] font-black uppercase tracking-widest text-slate-500 flex items-center justify-between">
+                                                            Visual AI Prompt
+                                                            <button 
+                                                                onClick={() => {
+                                                                    navigator.clipboard.writeText(slide.image_prompt);
+                                                                    alert('Prompt copied!');
+                                                                }}
+                                                                className="text-teal-400 hover:text-white transition-colors"
+                                                            >
+                                                                <span className="material-icons text-xs">content_copy</span>
+                                                            </button>
+                                                        </span>
+                                                        <p className="text-[9px] font-mono text-slate-400 italic line-clamp-2">
+                                                            {slide.image_prompt}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+
+                                {/* Caption Details */}
+                                <div className="bg-slate-900 border border-white/5 rounded-3xl p-6 md:p-8 flex flex-col gap-6 shadow-2xl relative">
+                                    <div className="flex items-center justify-between border-b border-white/5 pb-4">
+                                        <h3 className="text-xl md:text-2xl font-black text-white uppercase tracking-tight flex items-center gap-2">
+                                            Synthesized Caption
+                                        </h3>
+                                        <button
+                                            onClick={() => {
+                                                navigator.clipboard.writeText(instagramData.caption);
+                                                alert('Caption copied!');
+                                            }}
+                                            className="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 px-4 py-2 rounded-xl transition-all border border-teal-500/20"
+                                        >
+                                            <span className="material-icons text-xs">content_copy</span>
+                                            Copy Caption
+                                        </button>
+                                    </div>
+
+                                    <p className="text-slate-300 text-sm font-medium leading-relaxed whitespace-pre-wrap">
+                                        {instagramData.caption}
+                                    </p>
+
+                                    <div className="flex flex-wrap gap-2 pt-4 border-t border-white/5">
+                                        {instagramData.hashtags?.map((tag) => (
+                                            <span 
+                                                key={tag} 
+                                                className="text-[9px] font-black text-slate-400 uppercase tracking-widest bg-slate-950 border border-white/5 px-2.5 py-1.5 rounded-lg hover:text-teal-400 hover:border-teal-400/30 transition-all cursor-pointer"
+                                                onClick={() => {
+                                                    const cleanTag = tag.startsWith('#') ? tag : `#${tag}`;
+                                                    navigator.clipboard.writeText(cleanTag);
+                                                    alert(`Copied ${cleanTag}`);
+                                                }}
+                                            >
+                                                {tag.startsWith('#') ? tag : `#${tag}`}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="prose prose-invert prose-teal max-w-none">
+                                <ReactMarkdown
+                                    remarkPlugins={[remarkGfm]}
+                                    components={{
+                                        h1: ({ node, ...props }) => <h1 className="text-3xl md:text-5xl font-black text-white mt-12 md:mt-20 mb-6 md:mb-10 tracking-tighter uppercase" {...props} />,
+                                        h2: ({ node, ...props }) => <h2 className="text-2xl md:text-3xl font-black text-white mt-10 md:mt-16 mb-4 md:mb-8 tracking-tight border-b border-white/5 pb-4 md:pb-6 uppercase" {...props} />,
+                                        h3: ({ node, ...props }) => <h3 className="text-lg md:text-xl font-black text-teal-400 mt-8 md:mt-12 mb-4 md:mb-6 tracking-widest uppercase" {...props} />,
+                                        p: ({ node, ...props }) => <p className="text-slate-400 text-base md:text-lg leading-[1.8] mb-6 md:mb-10 font-medium tracking-wide" {...props} />,
+                                        li: ({ node, ...props }) => <li className="text-slate-400 text-base md:text-lg leading-relaxed mb-4 md:mb-6 list-none relative pl-8 before:content-[''] before:absolute before:left-0 before:top-2.5 md:before:top-3 before:w-2 before:h-2 before:bg-teal-500 before:rounded-full before:shadow-[0_0_10px_rgba(20,184,166,0.5)]" {...props} />,
+                                        blockquote: ({ node, ...props }) => (
+                                            <div className="bg-slate-900/50 border-l-4 border-indigo-500 p-8 md:p-12 my-10 md:my-14 rounded-2xl md:rounded-3xl italic text-slate-200 text-lg md:text-xl font-bold tracking-tight shadow-2xl relative overflow-hidden" {...props}>
+                                                <span className="material-icons absolute top-4 left-4 text-white/5 text-6xl md:text-8xl pointer-events-none">format_quote</span>
+                                                <div className="relative z-10">{props.children}</div>
+                                            </div>
+                                        )
+                                    }}
+                                >
+                                    {cleanContent}
+                                </ReactMarkdown>
+                            </div>
+                        )}
                     </article>
 
                     {/* Strategic Sidebar */}
@@ -246,16 +375,29 @@ const ArticlePreview = ({ post, onBack, onUpdate }) => {
                                     <span className="text-[8px] md:text-[10px] font-black text-teal-400 uppercase tracking-widest mb-3 md:mb-4">Verified Quality</span>
                                 </div>
 
-                                <div className="space-y-3 md:space-y-4 relative">
-                                    <div className="bg-slate-950 p-4 md:p-6 rounded-xl md:rounded-2xl border border-white/5 flex justify-between items-center group/item hover:bg-slate-800 transition-all">
-                                        <span className="text-[8px] md:text-[9px] font-black text-slate-500 uppercase tracking-widest">SERP Coverage</span>
-                                        <span className="text-xs font-black text-teal-400">{post.seo_data?.coverage || post.seo_data?.coverage_score || 0}%</span>
+                                {isInstagram ? (
+                                    <div className="space-y-3 md:space-y-4 relative">
+                                        <div className="bg-slate-950 p-4 md:p-6 rounded-xl md:rounded-2xl border border-white/5 flex justify-between items-center group/item hover:bg-slate-800 transition-all">
+                                            <span className="text-[8px] md:text-[9px] font-black text-slate-500 uppercase tracking-widest">Tone Profile</span>
+                                            <span className="text-xs font-black text-teal-400 capitalize">{post.seo_data?.tone || 'Educational'}</span>
+                                        </div>
+                                        <div className="bg-slate-950 p-4 md:p-6 rounded-xl md:rounded-2xl border border-white/5 hover:bg-slate-800 transition-all">
+                                            <span className="text-[8px] md:text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-1 md:mb-2">Target Audience</span>
+                                            <span className="text-xs font-black text-slate-200 uppercase tracking-widest truncate block capitalize">{post.seo_data?.audience || 'Developers'}</span>
+                                        </div>
                                     </div>
-                                    <div className="bg-slate-950 p-4 md:p-6 rounded-xl md:rounded-2xl border border-white/5 hover:bg-slate-800 transition-all">
-                                        <span className="text-[8px] md:text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-1 md:mb-2">Focus Keyword</span>
-                                        <span className="text-xs font-black text-slate-200 uppercase tracking-widest truncate block">{post.seo_data?.focus_keyword || 'N/A'}</span>
+                                ) : (
+                                    <div className="space-y-3 md:space-y-4 relative">
+                                        <div className="bg-slate-950 p-4 md:p-6 rounded-xl md:rounded-2xl border border-white/5 flex justify-between items-center group/item hover:bg-slate-800 transition-all">
+                                            <span className="text-[8px] md:text-[9px] font-black text-slate-500 uppercase tracking-widest">SERP Coverage</span>
+                                            <span className="text-xs font-black text-teal-400">{post.seo_data?.coverage || post.seo_data?.coverage_score || 0}%</span>
+                                        </div>
+                                        <div className="bg-slate-950 p-4 md:p-6 rounded-xl md:rounded-2xl border border-white/5 hover:bg-slate-800 transition-all">
+                                            <span className="text-[8px] md:text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-1 md:mb-2">Focus Keyword</span>
+                                            <span className="text-xs font-black text-slate-200 uppercase tracking-widest truncate block">{post.seo_data?.focus_keyword || 'N/A'}</span>
+                                        </div>
                                     </div>
-                                </div>
+                                )}
                             </div>
 
                             {/* Agent Command Center */}

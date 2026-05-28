@@ -130,3 +130,44 @@ async def regenerate_image_api(image_prompt, id, image_data):
     # ... logic would be similar to generate_image_api but with source_image ...
     # This is currently a stub in the original code, but I've hardened the infra around it.
     return None, None, None, False
+
+async def generate_image_pollinations(image_prompt, id, slug=None):
+    """
+    Generates high-quality AI images using Pollinations.ai's free API.
+    Requires no API key, works dynamically based on prompt, and downloads the image locally.
+    """
+    import urllib.parse
+    import uuid
+    import random
+
+    logger.warning(f"Starting Pollinations.ai generation for id {id}...")
+    prompt_text = image_prompt[0] if isinstance(image_prompt, list) else image_prompt
+    
+    # URL encode the prompt
+    encoded_prompt = urllib.parse.quote(prompt_text)
+    
+    # Pollinations image generation endpoint with random seed
+    seed = random.randint(1, 100000)
+    url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true&seed={seed}"
+    
+    async with aiohttp.ClientSession() as session:
+        try:
+            async with session.get(url) as resp:
+                resp.raise_for_status()
+                image_bytes = await resp.read()
+                
+            static_dir = Path("app/static/img/posts")
+            static_dir.mkdir(exist_ok=True, parents=True)
+            
+            name_base = slug if slug else f"img_{id}"
+            filename = f"{name_base}_{str(uuid.uuid4())[:8]}.jpg"
+            filepath = static_dir / filename
+            filepath.write_bytes(image_bytes)
+            
+            base64_image = base64.b64encode(image_bytes).decode()
+            crm_path = f"static/img/posts/{filename}"
+            return crm_path, str(filepath), base64_image, False
+        except Exception as e:
+            logger.error(f"Error generating image via Pollinations.ai: {e}")
+            return None, None, None, False
+

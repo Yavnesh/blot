@@ -27,12 +27,11 @@ class VoiceAgent(BaseAgent):
         if not org_id:
             return ""
             
+        db = SessionLocal()
         try:
-            db = SessionLocal()
             corrections = db.query(CorrectionLog).filter(
                 CorrectionLog.org_id == org_id
             ).order_by(desc(CorrectionLog.created_at)).limit(limit).all()
-            db.close()
             
             if not corrections:
                 return ""
@@ -49,6 +48,8 @@ class VoiceAgent(BaseAgent):
         except Exception as e:
             logger.error(f"Flywheel error fetching corrections: {e}")
             return ""
+        finally:
+            db.close()
 
     async def _execute(self, input_data: Dict[str, Any], context: Optional[Dict[str, Any]] = None) -> AgentOutput:
         draft_content = input_data.get("draft_content")
