@@ -1,0 +1,101 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.pytest_cache/
+.coverage
+.cache
+pip-log.txt
+pip-delete-this-directory.txt
+.venv
+venv/
+ENV/
+.env
+backend/.env
+*.env.local
+
+# Javascript/Node
+node_modules/
+dist/
+.npm
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.eslintcache
+.stylelintcache
+.parcel-cache
+.next
+out/
+.pnp*
+.yarn/
+
+# Frontend Build
+frontend/dist/
+frontend/build/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Databases
+*.db
+*.sqlite3
+backend/app.db
+
+# Project Specific
+.gemini/
+*.log
+logs/
+.pids/
+temp/
+tmp/
+tests/
+documentation/
+TEWS FULL DOCUMENTATION.pdf
+commit_message.txt
+project_files.txt
+start_dev.sh
+
+# Debugging & Scratch
+scratch/
+backend/scratch/
+debug_*.py
+backend/debug_*.py
+test_*.py
+backend/test_*.py
+populate_*.py
+backend/populate_*.py
+trigger_*.py
+backend/trigger_*.py
+reset_pass.py
+pipeline_auditor.py
+
+# Backups
+*_backup/
+backend/alembic/versions_backup/
+
+# Scripts
+scripts/*.py
+!scripts/__init__.py
+backend/scripts/*.py

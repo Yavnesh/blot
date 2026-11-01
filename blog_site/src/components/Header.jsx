@@ -44,9 +44,7 @@ export default function Header() {
     const navLinks = [
         { name: 'Home', path: '/' },
         { name: 'Articles', path: '/articles' },
-        { name: 'Categories', path: '/categories' },
         { name: 'About', path: '/about' },
-        { name: 'Subscribe', path: '/subscribe' },
     ];
 
     return (
@@ -113,7 +111,7 @@ export default function Header() {
                             </Link>
                         ))}
                         <Link to="/subscribe" onClick={() => setMobileMenuOpen(false)} className="bg-brand text-white px-10 py-4 rounded-full text-sm font-bold uppercase tracking-widest">
-                            Get Started
+                            Subscribe
                         </Link>
                     </div>
                 </div>

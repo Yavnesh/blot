@@ -53,7 +53,7 @@ function cleanPostData(post) {
         title: (embeddedTitle || post.title || 'Untitled').replace(/^#+\s*/, ''),
         excerpt: embeddedMeta || post.meta_description || post.excerpt || cleanBody.substring(0, 200),
         meta_description: embeddedMeta || post.meta_description || '',
-        slug: embeddedSlug || post.slug,
+        slug: post.slug,
         content: cleanBody
     }
 }

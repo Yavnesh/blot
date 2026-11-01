@@ -1,10 +1,15 @@
-
-from sqlalchemy import Column, Integer, String, Text, DateTime, JSON
+from sqlalchemy import Column, Integer, String, Text, DateTime, JSON, ForeignKey
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.db.base_class import Base
 
 class Post(Base):
     id = Column(Integer, primary_key=True, index=True)
+    org_id = Column(Integer, ForeignKey("organizations.id"), nullable=False, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id", ondelete="SET NULL"), nullable=True, index=True)
+    created_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    approved_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+
     post_id = Column(String, default='none')
     title = Column(JSON, default=[])
     meta = Column(Text, default='none')
@@ -18,6 +23,8 @@ class Post(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     status = Column(String, default='Pre Draft')
+    review_status = Column(String, default='drafting') # drafting, awaiting_creator_review, submitted_to_manager, changes_requested, manager_approved, published
+    target_platform = Column(String, default='blog') # blog, linkedin, twitter, instagram, facebook, medium
     survey = Column(JSON, default=[])
     image_prompt = Column(JSON, default=[])
     image_data = Column(JSON, default=[])
@@ -33,3 +40,9 @@ class Post(Base):
     agent_telemetry = Column(JSON, default=[]) # Detailed logs and scores for UI transparency
     pub_platform = Column(String, default='none') # wordpress, webflow, etc.
     pub_meta = Column(JSON, default={}) # platform specific IDs or status
+
+    # Relationships
+    project = relationship("Project", back_populates="posts")
+    created_by = relationship("User", foreign_keys=[created_by_id])
+    approved_by = relationship("User", foreign_keys=[approved_by_id])
+    comments = relationship("PostReviewComment", back_populates="post", cascade="all, delete-orphan")

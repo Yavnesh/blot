@@ -1,16 +1,43 @@
+from google import genai
+from google.genai import types
 from loguru import logger
-import google.generativeai as genai
-from google.generativeai.types import HarmCategory, HarmBlockThreshold
-import re, random, time
+import random
+import asyncio
+import time
+from collections import deque
+from typing import Dict, Any, List, Optional, Union
 from app.core.config import settings
-from app.models.task_progress import TaskProgress
-import os
 
-class MockResponse:
-    def __init__(self, text):
-        self.text = text
-        self.candidates = [None] # Minimal candidate structure for extract_pre_post_content
+# 1. KEY STATE MANAGEMENT
+class APIKeyState:
+    def __init__(self, key: str):
+        self.key = key
+        self.requests = deque()
+        self.cooldown_until = 0
+        self.is_leaked = False
 
+    def can_use(self, rpm_limit: int = 15) -> bool:
+        """Proactive check: Can this key handle a request right now?"""
+        if self.is_leaked:
+            return False
+            
+        now = time.time()
+        if now < self.cooldown_until:
+            return False
+
+        # Clean up old request timestamps (older than 60s)
+        while self.requests and now - self.requests[0] > 60:
+            self.requests.popleft()
+
+        return len(self.requests) < rpm_limit
+
+    def mark_used(self):
+        self.requests.append(time.time())
+
+    def cooldown(self, seconds: int = 60):
+        self.cooldown_until = time.time() + seconds
+
+# 2. GLOBAL POOL INITIALIZATION
 def get_all_api_keys():
     keys = [
         settings.GEMINI_API_KEY_1,
@@ -22,157 +49,142 @@ def get_all_api_keys():
     ]
     return [k for k in keys if k and k.strip()]
 
-def assign_random_api(exclude_keys=None):
-    if exclude_keys is None:
-        exclude_keys = []
-    apis_list = [k for k in get_all_api_keys() if k not in exclude_keys]
-    
-    if not apis_list:
-        # If all keys exhausted, try all available keys as a last resort
-        apis_list = get_all_api_keys()
-        if not apis_list:
-            raise ValueError("No Gemini API keys configured")
+_KEY_STATES = [APIKeyState(k) for k in get_all_api_keys()]
+GLOBAL_SEMAPHORE = asyncio.Semaphore(5) # Strict concurrency control
+
+async def get_available_key_state() -> APIKeyState:
+    """Intelligent key selection with least-used strategy."""
+    while True:
+        # Try to find an immediately available key
+        available_keys = [s for s in _KEY_STATES if s.can_use()]
+        if available_keys:
+            # Least used strategy
+            selected = min(available_keys, key=lambda s: len(s.requests))
+            selected.mark_used()
+            return selected
+            
+        # All keys busy or in cooldown
+        logger.debug("All Gemini keys busy/throttled. Waiting for availability...")
+        await asyncio.sleep(1)
+
+# 3. CORE GENERATION LOGIC (REFACTORED)
+async def _execute_genai_call(
+    method_name: str, 
+    model_id: str, 
+    contents: Any, 
+    config: Optional[Any] = None,
+    max_retries: int = 5
+):
+    """
+    Unified execution engine with proactive throttling, 
+    global concurrency protection, and intelligent retries.
+    """
+    async with GLOBAL_SEMAPHORE:
+        for attempt in range(max_retries):
+            key_state = await get_available_key_state()
+            client = genai.Client(api_key=key_state.key)
+            
+            try:
+                if method_name == "generate_content":
+                    return await client.aio.models.generate_content(
+                        model=model_id, contents=contents, config=config
+                    )
+                elif method_name == "embed_content":
+                    return await client.aio.models.embed_content(
+                        model=model_id, contents=contents, config=config
+                    )
+            except Exception as e:
+                err_str = str(e).lower()
+                
+                # 429: Rate Limit - Trigger backoff and rotate
+                if "429" in err_str or "rate_limit" in err_str:
+                    # Exponential cooldown with jitter
+                    wait_sec = min(60, (2 ** attempt) + random.uniform(1, 5))
+                    logger.warning(f"Key {key_state.key[:6]}*** hit 429. Cooling down for {wait_sec:.1f}s")
+                    key_state.cooldown(int(wait_sec))
+                    continue
+                
+                # 503: Service Unavailable - Temporary cooldown
+                elif "503" in err_str or "unavailable" in err_str:
+                    logger.warning(f"Gemini 503 Service Unavailable. Cooling down key {key_state.key[:6]}***")
+                    key_state.cooldown(30)
+                    continue
+                
+                # Permanent failures: Blacklist the key
+                elif any(msg in err_str for msg in ["leaked", "403", "invalid", "permission"]):
+                    logger.error(f"Permanent failure for key {key_state.key[:6]}***. Blacklisting.")
+                    key_state.is_leaked = True
+                    continue
+                
+                # Other errors (404, etc.) - Raise immediately
+                logger.error(f"GenAI Exception: {e}")
+                raise e
+
+        raise RuntimeError(f"All Gemini retries exhausted for {model_id} after {max_retries} attempts.")
+
+# 4. PUBLIC API
+async def generate_response_async(prompt: str, model_id: str = "gemini-flash-latest"):
+    """Async generation with integrated rate limiting."""
+    response = await _execute_genai_call("generate_content", model_id, prompt)
+    return response
+
+async def generate_structured_async(prompt: str, output_schema: type, model_id: str = "gemini-flash-latest"):
+    """Structured generation with JSON schema enforcement."""
+    config = types.GenerateContentConfig(
+        response_mime_type="application/json",
+        response_schema=output_schema,
+    )
+    response = await _execute_genai_call("generate_content", model_id, prompt, config=config)
+    return response
+
+async def generate_embeddings(text: str, model_id: str = "gemini-embedding-001"):
+    """Vector embedding generation with strict dimensionality enforcement (768)."""
+    config = None
+    if model_id == "text-embedding-004":
+        config = types.EmbedContentConfig(output_dimensionality=768)
         
-    selected_api = random.choice(apis_list)
-    genai.configure(api_key=selected_api)
-    model = genai.GenerativeModel('gemini-flash-latest')
+    try:
+        response = await _execute_genai_call("embed_content", model_id, text, config=config)
+        vec = response.embeddings[0].values
+        # Force 768 to match DB schema
+        return vec[:768] if len(vec) >= 768 else vec + [0.0] * (768 - len(vec))
+    except Exception as e:
+        logger.warning(f"Embedding failed for {model_id}, falling back to gemini-embedding-001: {e}")
+        if model_id != "gemini-embedding-001":
+            return await generate_embeddings(text, model_id="gemini-embedding-001")
+        return [0.0] * 768
 
-    safety_setting={
-        HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
-        HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
-        HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
-        HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
-    }
-    return model, safety_setting, selected_api
+async def describe_image(image_bytes: bytes, mime_type: str):
+    """Multimodal vision analysis with rate limiting."""
+    contents = [
+        types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
+        "Provide a detailed technical and semantic description of this image for a knowledge base."
+    ]
+    response = await _execute_genai_call("generate_content", "gemini-flash-latest", contents)
+    return response.text
 
-def generate_response_single(prompt):
-    all_keys = get_all_api_keys()
-    exclude_keys = []
-    # Try at least as many times as we have keys, plus a couple extra retries with backoff
-    max_total_attempts = len(all_keys) + 2
-    
-    for attempt in range(max_total_attempts):
-        try:
-            model, safety_setting, current_key = assign_random_api(exclude_keys)
-            response = model.generate_content(prompt, safety_settings=safety_setting)
-            return response
-        except Exception as e:
-            if "429" in str(e):
-                logger.warning(f"Key rate limited (429). Rotating key... (Attempt {attempt+1}/{max_total_attempts})")
-                exclude_keys.append(current_key)
-                # If we've tried all keys, wait longer before starting over
-                wait_time = 5 if len(exclude_keys) >= len(all_keys) else 2
-                time.sleep(wait_time)
-            else:
-                logger.error(f"Gemini API error: {e}")
-                raise e
-    logger.error("All Gemini API keys exhausted or rate limited definitively. Falling back to MOCK response for testing.")
-    return MockResponse("This is a MOCK response for testing. The real API is rate limited. [MOCK DATA]")
-
-def generate_response_chat(prompt, messages):
-    all_keys = get_all_api_keys()
-    exclude_keys = []
-    max_total_attempts = len(all_keys) + 2
-    
-    for attempt in range(max_total_attempts):
-        try:
-            model, safety_setting, current_key = assign_random_api(exclude_keys)
-            chat_messages = []
-            for m in messages:
-                chat_messages.append({'role': m['role'], 'parts': [m['parts'][0]]})
-            
-            chat_messages.append({'role': 'user', 'parts': [prompt]})
-            response = model.generate_content(chat_messages, safety_settings=safety_setting)
-            
-            # Update messages for next turn
-            messages.append({'role': 'user', 'parts': [prompt]})
-            messages.append({'role': 'model', 'parts': [response.text]})
-            return messages, response
-        except Exception as e:
-            if "429" in str(e):
-                logger.warning(f"Key rate limited (429) in chat. Rotating key... (Attempt {attempt+1}/{max_total_attempts})")
-                exclude_keys.append(current_key)
-                wait_time = 5 if len(exclude_keys) >= len(all_keys) else 2
-                time.sleep(wait_time)
-            else:
-                logger.error(f"Gemini API chat error: {e}")
-                raise e
-    logger.error("All Gemini API keys exhausted or rate limited definitively in chat. Falling back to MOCK response for testing.")
-    messages.append({'role': 'user', 'parts': [prompt]})
-    messages.append({'role': 'model', 'parts': ["MOCK chat response. [MOCK DATA]"]})
-    return messages, MockResponse("MOCK chat response. [MOCK DATA]")
-
-def extract_pre_post_content(response):
-    if not response: return ""
-    if isinstance(response, MockResponse):
+def extract_pre_post_content(response) -> str:
+    """Helper to extract text from GenAI response objects."""
+    if hasattr(response, 'text'):
         return response.text
-    if hasattr(response, 'candidates') and response.candidates and response.candidates[0]:
-        try:
-            return response.candidates[0].content.parts[0].text
-        except (IndexError, AttributeError) as e:
-            logger.error(f"Error accessing parts: {e}")
-            return ""
-    elif hasattr(response, 'text'):
-        return response.text
-    return ""
+    if isinstance(response, str):
+        return response
+    if isinstance(response, dict) and 'text' in response:
+        return response['text']
+    return str(response)
 
-def generate_image_prompt(merged_content):
-    p = generate_image_prompt_one(merged_content)
-    _, r = generate_response_chat(p, [])
-    p = generate_image_prompt_two()
-    _, r = generate_response_chat(p, [])
-    return extract_pre_post_content(r)
+# Synchronous Wrappers
+async def generate_structured(prompt: str, output_schema: type, model_id: str = "gemini-flash-latest"):
+    return await generate_structured_async(prompt, output_schema, model_id)
 
-def generate_content_info(merged_content):
-    p = generate_content_info_one(merged_content)
-    return extract_pre_post_content(generate_response_single(p))
+def generate_structured_sync(prompt: str, output_schema: type):
+    return asyncio.run(generate_structured(prompt, output_schema))
 
-def generate_content_cta(merged_content):
-    p = generate_content_cta_one(merged_content)
-    res = extract_pre_post_content(generate_response_single(p))
-    if not res: return []
-    qs = res.split("**Question of survey ")[1:]
-    return [[o.strip() for o in q.split("\n")[1:] if o.strip()] for q in qs]
+async def generate_response(prompt: str, model_id: str = "gemini-flash-latest"):
+    return await generate_response_async(prompt, model_id)
 
-def generate_meta_info(rel_t, rel_q, merged):
-    p = generate_meta_info_one(merged, rel_t, rel_q)
-    return extract_pre_post_content(generate_response_single(p))
+def generate_response_single(prompt: str):
+    return asyncio.run(generate_response_async(prompt))
 
-def generate_short_content(merged):
-    p = generate_short_content_one(merged)
-    return extract_pre_post_content(generate_response_single(p))
-
-def generate_trend_topics(merged, kw):
-    p = generate_trend_topics_one(merged, kw)
-    return extract_pre_post_content(generate_response_single(p))
-
-def generate_content(topic, short, merged, rel_t, rel_q, cat):
-    author = select_author(cat[0] if isinstance(cat, list) and cat else "Technology")
-    p1 = generate_content_prompt_one(short[0] if isinstance(short, list) else short)
-    msgs, r = generate_response_chat(p1, [])
-    p2 = generate_content_prompt_two(topic, merged, rel_t, rel_q, cat)
-    msgs, r = generate_response_chat(p2, msgs)
-    p3 = generate_content_prompt_three()
-    msgs, r = generate_response_chat(p3, msgs)
-    return extract_pre_post_content(r), author
-
-def generate_twitter_post(merged):
-    p = generate_twitter_post_one(merged)
-    return extract_pre_post_content(generate_response_single(p))
-
-def select_author(c):
-    return {"Technology": "tessa@tewsletter.com", "Finance": "monica@tewsletter.com"}.get(c, "william@tewsletter.com")
-
-def generate_image_prompt_one(m): return f"Content: {m}\nImage ideas..."
-def generate_image_prompt_two(): return "Prompts..."
-def generate_image_prompt_three(): return "Rank..."
-def generate_image_prompt_four(): return "Top 3..."
-def generate_content_info_one(m): return f"Info for: {m}"
-def generate_content_cta_one(m): return f"Survey for: {m}"
-def generate_meta_info_one(m, t, q): return f"Meta for: {m}"
-def generate_short_content_one(m): return f"Article for: {m}"
-def generate_trend_topics_one(m, k): return f"Trends for: {m}"
-def generate_content_prompt_one(s): return f"Outline for: {s}"
-def generate_content_prompt_two(t, m, rt, rq, c): return f"1200 words on {t}"
-def generate_content_prompt_three(): return "Refine: Proofread, 1000+ words."
-def generate_twitter_post_one(m): return f"Tweet for: {m}"
+def generate_embeddings_sync(text: str):
+    return asyncio.run(generate_embeddings(text))

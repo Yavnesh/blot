@@ -4,17 +4,19 @@ from sqlalchemy.orm import Session
 from app.api import deps
 from app.models.twitter_post import TwitterPost
 from app.schemas.twitter_post import TwitterPostCreate, TwitterPostUpdate, TwitterPost as TwitterPostSchema
+from app.models.user import User
 
 router = APIRouter()
 
 @router.get("/", response_model=List[TwitterPostSchema])
 def read_twitter_posts(
     db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_active_user),
     skip: int = 0,
     limit: int = 100,
 ) -> Any:
     """
-    Retrieve twitter posts.
+    Retrieve twitter posts. Requires authentication.
     """
     twitter_posts = db.query(TwitterPost).offset(skip).limit(limit).all()
     return twitter_posts
@@ -23,10 +25,11 @@ def read_twitter_posts(
 def create_twitter_post(
     *,
     db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_active_user),
     twitter_post_in: TwitterPostCreate,
 ) -> Any:
     """
-    Create new twitter post.
+    Create new twitter post. Requires authentication.
     """
     twitter_post = TwitterPost(**twitter_post_in.model_dump())
     db.add(twitter_post)
@@ -38,10 +41,11 @@ def create_twitter_post(
 def read_twitter_post(
     *,
     db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_active_user),
     id: int,
 ) -> Any:
     """
-    Get twitter post by ID.
+    Get twitter post by ID. Requires authentication.
     """
     twitter_post = db.query(TwitterPost).filter(TwitterPost.id == id).first()
     if not twitter_post:
@@ -52,11 +56,12 @@ def read_twitter_post(
 def update_twitter_post(
     *,
     db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_active_user),
     id: int,
     twitter_post_in: TwitterPostUpdate,
 ) -> Any:
     """
-    Update a twitter post.
+    Update a twitter post. Requires authentication.
     """
     twitter_post = db.query(TwitterPost).filter(TwitterPost.id == id).first()
     if not twitter_post:
@@ -73,10 +78,11 @@ def update_twitter_post(
 def delete_twitter_post(
     *,
     db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_active_user),
     id: int,
 ) -> Any:
     """
-    Delete a twitter post.
+    Delete a twitter post. Requires authentication.
     """
     twitter_post = db.query(TwitterPost).filter(TwitterPost.id == id).first()
     if not twitter_post:

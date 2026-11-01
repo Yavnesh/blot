@@ -1,10 +1,11 @@
-
-from sqlalchemy import Column, Integer, String, Text, DateTime, JSON
+from sqlalchemy import Column, Integer, String, Text, DateTime, JSON, ForeignKey
 from sqlalchemy.sql import func
 from app.db.base_class import Base
+from app.models.user import Organization
 
 class Trending(Base):
     id = Column(Integer, primary_key=True, index=True)
+    org_id = Column(Integer, ForeignKey("organizations.id"), nullable=False, index=True)
     topic = Column(String, default='none')
     related_topics_rising = Column(JSON, default=[])
     related_topics_top = Column(JSON, default=[])

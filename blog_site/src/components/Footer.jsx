@@ -37,7 +37,7 @@ export default function Footer() {
                     <div className="lg:col-span-3">
                         <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-neutral-900 dark:text-white mb-8 mt-2">Explore</h4>
                         <ul className="space-y-4">
-                            {['Home', 'Articles', 'Categories', 'Premium', 'About'].map(link => (
+                            {['Home', 'Articles', 'About'].map(link => (
                                 <li key={link}>
                                     <Link to={`/${link.toLowerCase()}`} className="text-sm font-medium text-neutral-500 hover:text-neutral-900 dark:hover:text-white transition-colors">
                                         {link}
@@ -51,15 +51,10 @@ export default function Footer() {
                     <div className="lg:col-span-4">
                         <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-neutral-900 dark:text-white mb-8 mt-2">Intelligence Briefing</h4>
                         <p className="text-sm text-neutral-400 dark:text-neutral-500 mb-6 font-medium">Join our editorial list for early access to deep-tech research and essays.</p>
-                        <div className="relative">
-                            <input
-                                type="email"
-                                placeholder="email@example.com"
-                                className="w-full bg-neutral-50 dark:bg-neutral-800 border border-neutral-100 dark:border-neutral-700 rounded-full py-4 px-6 text-sm outline-none focus:border-neutral-900 dark:focus:border-brand transition-all font-medium dark:text-white"
-                            />
-                            <button className="absolute right-2 top-2 bg-neutral-900 dark:bg-brand text-white p-2 rounded-full hover:bg-neutral-800 dark:hover:bg-brand-dark transition-all">
-                                <Mail size={16} />
-                            </button>
+                        <div className="flex">
+                            <Link to="/subscribe" className="bg-neutral-900 dark:bg-brand text-white px-8 py-4 rounded-full text-xs font-bold uppercase tracking-widest hover:bg-neutral-800 dark:hover:bg-brand-dark transition-all shadow-lg shadow-neutral-200 dark:shadow-none inline-flex items-center gap-3">
+                                Subscribe Now <Mail size={16} />
+                            </Link>
                         </div>
                     </div>
                 </div>

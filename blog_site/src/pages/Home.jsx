@@ -40,9 +40,9 @@ export default function Home() {
                                 <Link to="/articles" className="bg-neutral-900 dark:bg-white dark:text-neutral-900 text-white px-10 py-5 rounded-full text-xs font-bold uppercase tracking-widest hover:bg-neutral-800 dark:hover:bg-neutral-100 transition-all hover:translate-x-1 flex items-center gap-3 shadow-xl shadow-neutral-200 dark:shadow-none">
                                     Read Articles <ArrowRight size={14} />
                                 </Link>
-                                <button className="border-2 border-neutral-100 dark:border-neutral-800 px-10 py-5 rounded-full text-xs font-bold uppercase tracking-widest hover:border-brand transition-all hover:bg-brand/5 dark:text-white">
+                                <Link to="/subscribe" className="border-2 border-neutral-100 dark:border-neutral-800 px-10 py-5 rounded-full text-xs font-bold uppercase tracking-widest hover:border-brand transition-all hover:bg-brand/5 dark:text-white inline-block">
                                     Subscribe
-                                </button>
+                                </Link>
                             </div>
                         </div>
 
@@ -112,19 +112,11 @@ export default function Home() {
                             <p className="text-neutral-400 text-lg md:text-xl mb-12 italic">
                                 Subscribe to receive new articles, deep-dives into human creative logic, and technology news directly in your inbox.
                             </p>
-                            <form className="flex flex-col sm:flex-row gap-4 max-w-xl mx-auto">
-                                <div className="flex-1 relative">
-                                    <input
-                                        type="email"
-                                        placeholder="Enter your email address"
-                                        className="w-full bg-white/5 border border-white/10 rounded-full py-5 px-8 text-white placeholder:text-neutral-600 outline-none focus:border-brand transition-all"
-                                    />
-                                    <Mail className="absolute right-6 top-1/2 -translate-y-1/2 text-neutral-600 w-5 h-5" />
-                                </div>
-                                <button className="bg-brand text-white px-10 py-5 rounded-full text-xs font-black uppercase tracking-widest hover:bg-brand-dark transition-all transform hover:-translate-y-1 active:scale-95 shadow-xl shadow-brand/20">
+                            <div className="flex justify-center">
+                                <Link to="/subscribe" className="bg-brand text-white px-12 py-5 rounded-full text-xs font-black uppercase tracking-widest hover:bg-brand-dark transition-all transform hover:-translate-y-1 active:scale-95 shadow-xl shadow-brand/20 inline-block">
                                     Subscribe Now
-                                </button>
-                            </form>
+                                </Link>
+                            </div>
                             <p className="mt-8 text-neutral-500 text-[10px] uppercase font-bold tracking-widest opacity-50">
                                 Join 5,000+ readers. No spam, just intelligence.
                             </p>
