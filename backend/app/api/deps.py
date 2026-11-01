@@ -84,35 +84,83 @@ def _get_user_role_in_org(db: Session, user_id: int, org_id: int) -> Optional[st
     return row.role if row else None
 
 
+def _normalize_role(role: Optional[str]) -> str:
+    """Normalize legacy role strings (owner, editor, member) to (admin, manager, creator)."""
+    if not role:
+        return "creator"
+    r = role.lower()
+    if r in ("owner", "admin"):
+        return "admin"
+    if r in ("editor", "manager"):
+        return "manager"
+    return "creator"
+
+
 def require_role(*allowed_roles: str):
     """
-    RBAC dependency factory. Usage:
-        @router.post("/admin-only")
-        def admin_endpoint(
-            ...,
-            _role_check = Depends(require_role("owner", "editor")),
-        ):
-    
-    Superusers bypass the role check entirely.
+    RBAC dependency factory.
+    Allowed roles: 'admin', 'manager', 'creator' (and legacy equivalents: 'owner', 'editor', 'member')
     """
+    normalized_allowed = {_normalize_role(r) for r in allowed_roles}
+
     def _role_checker(
         db: Session = Depends(get_db),
         current_user: User = Depends(get_current_active_user),
         current_org: Organization = Depends(get_current_active_org),
     ):
-        # Superusers bypass RBAC
         if current_user.is_superuser:
             return current_user
         
-        role = _get_user_role_in_org(db, current_user.id, current_org.id)
-        if role not in allowed_roles:
+        raw_role = _get_user_role_in_org(db, current_user.id, current_org.id)
+        user_role = _normalize_role(raw_role)
+        
+        # Admin has access to all manager and creator endpoints
+        if user_role == "admin":
+            return current_user
+        # Manager has access to creator endpoints
+        if user_role == "manager" and ("creator" in normalized_allowed or "manager" in normalized_allowed):
+            return current_user
+
+        if user_role not in normalized_allowed:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Insufficient permissions. Required: {', '.join(allowed_roles)}. Your role: {role or 'none'}",
+                detail=f"Insufficient permissions. Required: {', '.join(allowed_roles)}. Your role: {raw_role or 'none'}",
             )
         return current_user
     
     return _role_checker
+
+
+def require_project_access(
+    project_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+    current_org: Organization = Depends(get_current_active_org),
+):
+    """Verifies that the project exists within the organization and the user is authorized."""
+    from app.models.project import Project, ProjectMember
+
+    project = db.query(Project).filter(Project.id == project_id, Project.org_id == current_org.id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found in organization")
+
+    if current_user.is_superuser:
+        return project
+
+    role = _normalize_role(_get_user_role_in_org(db, current_user.id, current_org.id))
+    if role in ("admin", "manager"):
+        return project
+
+    # Creator must be explicitly assigned to the project
+    is_member = db.query(ProjectMember).filter(
+        ProjectMember.project_id == project.id,
+        ProjectMember.user_id == current_user.id
+    ).first()
+
+    if not is_member:
+        raise HTTPException(status_code=403, detail="User is not assigned to this project")
+
+    return project
 
 
 def verify_quota(feature: str):

@@ -15,6 +15,7 @@ from app.models.task_progress import TaskProgress
 from app.models.trending import Trending
 from app.models.user import Organization
 from app.schemas.pipeline import PipelineTrigger, ApprovalRequest
+from app.schemas.rewind import JobRewindRequest
 from app.core.redis import redis_client
 from loguru import logger
 
@@ -287,6 +288,42 @@ async def approve_task(
     )
 
     return {"message": "Task resume triggered", "task_id": task_id}
+
+@router.post("/rewind/{task_id}", response_model=dict)
+async def rewind_generation_step(
+    task_id: str,
+    rewind_in: JobRewindRequest,
+    db: Session = Depends(deps.get_db),
+    current_org: Organization = Depends(deps.get_current_active_org),
+    _role_check = Depends(deps.require_role("admin", "manager", "creator"))
+) -> Any:
+    """
+    Granular HITL: Rewind the pipeline to a previous step (e.g., research, strategy, writing),
+    inject user comments / state overrides, and re-execute forward.
+    """
+    from app.schemas.rewind import JobRewindRequest
+    progress = db.query(TaskProgress).filter(TaskProgress.task_id == task_id, TaskProgress.org_id == current_org.id).first()
+    if not progress:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    progress.status = "running"
+    progress.current_step = rewind_in.target_node
+    db.commit()
+
+    from app.modules.orchestrator.service.pipeline_tasks import rewind_seo_pipeline_task
+    rewind_seo_pipeline_task.delay(
+        job_id=task_id,
+        org_id=current_org.id,
+        target_node=rewind_in.target_node,
+        feedback=rewind_in.feedback or "",
+        state_overrides=rewind_in.state_overrides or {}
+    )
+
+    return {
+        "message": f"Pipeline rewound to step '{rewind_in.target_node}' and resumed.",
+        "task_id": task_id,
+        "target_node": rewind_in.target_node
+    }
 
 @router.websocket("/ws/tasks/{org_id}")
 async def websocket_tasks(

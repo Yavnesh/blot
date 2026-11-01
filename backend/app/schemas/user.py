@@ -1,4 +1,4 @@
-from typing import Optional, List
+from typing import Optional, List, Any
 from pydantic import BaseModel, EmailStr
 
 # Token schemas
@@ -55,8 +55,8 @@ class OrganizationBase(BaseModel):
     key_messages: Optional[str] = None
     competitors: Optional[str] = None
     personalization_enabled: Optional[bool] = True
-    blog_sources: Optional[List[dict]] = None
-    instagram_sources: Optional[List[dict]] = None
+    blog_sources: Optional[List[Any]] = None
+    instagram_sources: Optional[List[Any]] = None
 
 class OrganizationCreate(OrganizationBase):
     name: str

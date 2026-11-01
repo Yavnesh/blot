@@ -30,8 +30,8 @@ const OrchestratorStepper = memo(() => {
     };
 
     return (
-        <div className="glass-panel p-6 overflow-x-auto no-scrollbar">
-            <div className="flex items-center justify-between gap-4 min-w-[800px]">
+        <div className="p-2 md:p-3 overflow-x-auto no-scrollbar">
+            <div className="flex items-center justify-between gap-3 min-w-[720px] pb-5 pt-1">
             {NODES.map((node, i) => {
                 const status = getNodeStatus(node.id);
                 const isFirst = i === 0;
@@ -40,32 +40,32 @@ const OrchestratorStepper = memo(() => {
                 return (
                     <div key={node.id} className="flex items-center flex-1 min-w-fit cursor-pointer group/node" onClick={() => setSelectedNode(node.id)}>
                         {!isFirst && (
-                            <div className={`h-[1px] flex-1 min-w-[20px] mx-4 ${
+                            <div className={`h-[1px] flex-1 min-w-[16px] mx-3 ${
                                 status === 'completed' ? 'bg-teal-500' : 'bg-slate-800'
                             }`} />
                         )}
                         
                         <div className="relative group">
                             <motion.div
-                                animate={status === 'active' ? { scale: [1, 1.1, 1], opacity: 1 } : { scale: 1 }}
-                                className={`w-10 h-10 rounded-xl flex items-center justify-center border-2 transition-all duration-500 group-hover/node:scale-110 ${
+                                animate={status === 'active' ? { scale: [1, 1.08, 1], opacity: 1 } : { scale: 1 }}
+                                className={`w-8 h-8 md:w-9 md:h-9 rounded-xl flex items-center justify-center border-2 transition-all duration-300 group-hover/node:scale-105 ${
                                     isSelected ? 'ring-2 ring-white/50 ring-offset-2 ring-offset-slate-900 ' : ''
                                 }${
                                     status === 'completed' ? 'bg-teal-500/10 border-teal-500 text-teal-400' :
-                                    status === 'active' ? (node.id === 'approval' ? 'bg-amber-500/10 border-amber-500 text-amber-500 shadow-[0_0_20px_rgba(245,158,11,0.3)]' : 'bg-teal-500/10 border-teal-500 text-teal-400 shadow-[0_0_20px_rgba(45,212,191,0.3)]') :
+                                    status === 'active' ? (node.id === 'approval' ? 'bg-amber-500/10 border-amber-500 text-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.3)]' : 'bg-teal-500/10 border-teal-500 text-teal-400 shadow-[0_0_15px_rgba(45,212,191,0.3)]') :
                                     'bg-slate-900 border-slate-800 text-slate-600'
                                 }`}
                             >
-                                {status === 'completed' && <Check size={18} />}
+                                {status === 'completed' && <Check size={14} />}
                                 {status === 'active' && (
-                                    node.id === 'approval' ? <UserCheck size={18} className="animate-pulse" /> :
-                                    <Loader2 size={18} className="animate-spin" />
+                                    node.id === 'approval' ? <UserCheck size={14} className="animate-pulse" /> :
+                                    <Loader2 size={14} className="animate-spin" />
                                 )}
-                                {status === 'pending' && <span className="text-[10px] font-black">{i + 1}</span>}
+                                {status === 'pending' && <span className="text-[9px] font-black">{i + 1}</span>}
                             </motion.div>
 
-                            <div className="absolute top-12 left-1/2 -translate-x-1/2 whitespace-nowrap">
-                                <span className={`text-[10px] font-black uppercase tracking-widest ${
+                            <div className="absolute top-10 left-1/2 -translate-x-1/2 whitespace-nowrap">
+                                <span className={`text-[9px] font-black uppercase tracking-widest ${
                                     status === 'active' ? 'text-white' : 'text-slate-500'
                                 }`}>
                                     {node.label}

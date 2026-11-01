@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Book, Zap, Database, Save, Globe, CheckCircle2, AlertTriangle, Terminal, BrainCircuit, Search, ArrowRight, Cpu, Sparkles, Users, Type, Sliders } from 'lucide-react';
+import { Book, Zap, Database, Save, Globe, CheckCircle2, AlertTriangle, Terminal, BrainCircuit, Search, ArrowRight, Cpu, Sparkles, Users, Type, Sliders, ChevronDown, ChevronUp } from 'lucide-react';
 import OrchestratorStepper from '../components/OrchestratorStepper';
 import BionicEditor from '../components/BionicEditor';
 import BrandVault from '../components/BrandVault';
@@ -45,6 +45,7 @@ const BionicWorkspace = () => {
 
     // Formatting/Length States
     const [wordCountTarget, setWordCountTarget] = useState(1000);
+    const [taxonomyExpanded, setTaxonomyExpanded] = useState(false);
 
     // Initialize the WebSocket listener for LangGraph updates
     usePipelineSocket();
@@ -55,15 +56,23 @@ const BionicWorkspace = () => {
                 const res = await api.get('/taxonomy/');
                 setTaxonomyData(res.data);
                 
-                // Set default primaries
+                // Set default primaries and first secondaries
                 const audienceCat = res.data.find(c => c.name === "Target Audience");
                 if (audienceCat && audienceCat.primary_subcategories?.length > 0) {
-                    setAudiencePrimary(String(audienceCat.primary_subcategories[0].id));
+                    const firstAudience = audienceCat.primary_subcategories[0];
+                    setAudiencePrimary(String(firstAudience.id));
+                    if (firstAudience.secondary_subcategories?.length > 0) {
+                        setAudienceSecondaries([firstAudience.secondary_subcategories[0].id]);
+                    }
                 }
                 
                 const toneCat = res.data.find(c => c.name === "Editorial Tone");
                 if (toneCat && toneCat.primary_subcategories?.length > 0) {
-                    setTonePrimary(String(toneCat.primary_subcategories[0].id));
+                    const firstTone = toneCat.primary_subcategories[0];
+                    setTonePrimary(String(firstTone.id));
+                    if (firstTone.secondary_subcategories?.length > 0) {
+                        setToneSecondaries([firstTone.secondary_subcategories[0].id]);
+                    }
                 }
             } catch (e) {
                 console.error("Failed to fetch taxonomy:", e);
@@ -147,160 +156,179 @@ const BionicWorkspace = () => {
                     </div>
 
                     <div className="flex flex-col gap-6 mb-6">
-                        {/* Length & Formatting Constraints */}
-                        <div className="flex flex-col gap-2 max-w-xl">
-                            <label className="text-[9px] font-black uppercase tracking-widest text-slate-500 flex items-center gap-2">
-                                <Sliders size={12} className="text-teal-400" /> Length & Formatting
-                            </label>
-                            <div className="flex flex-wrap gap-2">
-                                {[500, 1000, 1500, 2000].map(words => (
-                                    <button
-                                        key={words}
-                                        onClick={() => setWordCountTarget(words)}
-                                        className={`flex-1 py-3 px-4 rounded-xl font-bold text-[9px] md:text-xs uppercase tracking-widest border transition-all min-w-[120px] ${
-                                            wordCountTarget === words 
-                                                ? 'bg-teal-500/10 border-teal-500/30 text-teal-400' 
-                                                : 'bg-slate-950 border-white/5 text-slate-500 hover:text-slate-300'
-                                        }`}
-                                    >
-                                        {words === 500 ? 'Short (~500w)' : words === 1000 ? 'Standard (~1000w)' : words === 1500 ? 'Long (~1500w)' : 'Deep (~2000w)'}
-                                    </button>
-                                ))}
+                        {/* Compact Formatting & Taxonomy Controls */}
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                            {/* Length & Formatting Constraints */}
+                            <div className="flex items-center gap-3 flex-wrap">
+                                <span className="text-[9px] font-black uppercase tracking-widest text-slate-500 flex items-center gap-1.5 shrink-0">
+                                    <Sliders size={12} className="text-teal-400" /> Target Length:
+                                </span>
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                    {[500, 1000, 1500, 2000].map(words => (
+                                        <button
+                                            key={words}
+                                            onClick={() => setWordCountTarget(words)}
+                                            className={`py-1.5 px-3 rounded-lg font-bold text-[9px] uppercase tracking-wider border transition-all ${
+                                                wordCountTarget === words 
+                                                    ? 'bg-teal-500/10 border-teal-500/40 text-teal-400 shadow-sm shadow-teal-500/10' 
+                                                    : 'bg-slate-950/60 border-white/5 text-slate-500 hover:text-slate-300'
+                                            }`}
+                                        >
+                                            {words === 500 ? '500w' : words === 1000 ? '1000w' : words === 1500 ? '1500w' : '2000w'}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
+
+                            {/* Collapse / Expand Taxonomy button */}
+                            <button
+                                type="button"
+                                onClick={() => setTaxonomyExpanded(!taxonomyExpanded)}
+                                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-950/60 hover:bg-slate-950 text-slate-400 hover:text-white border border-white/5 text-[9px] font-black uppercase tracking-wider transition-all self-start md:self-auto"
+                            >
+                                <Users size={12} className="text-teal-400" />
+                                <span>Audience & Tone Settings</span>
+                                {taxonomyExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                            </button>
                         </div>
 
-                        {/* Hierarchical Taxonomies */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            {/* Target Audience Config */}
-                            <div className="flex flex-col gap-4 bg-slate-950/40 p-5 rounded-2xl border border-white/5">
-                                <label className="text-[10px] font-black uppercase tracking-widest text-teal-400 flex items-center gap-2">
-                                    <Users size={14} /> Target Audience Config
-                                </label>
-                                
-                                <div className="flex flex-col gap-1">
-                                    <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Primary Subcategory</span>
-                                    <select
-                                        value={audiencePrimary || ''}
-                                        onChange={(e) => handleAudiencePrimaryChange(e.target.value)}
-                                        className="w-full bg-slate-950 border-2 border-white/5 rounded-xl px-4 py-3 text-xs font-bold text-white uppercase tracking-widest focus:outline-none focus:ring-2 focus:ring-teal-500/20"
-                                    >
-                                        <option value="" disabled>Select Primary Subcategory</option>
-                                        {audiencePrimaryOptions.map(prim => (
-                                            <option key={prim.id} value={prim.id}>{prim.name}</option>
-                                        ))}
-                                    </select>
-                                </div>
+                        {/* Hierarchical Taxonomies (Collapsible to eliminate vertical scroll) */}
+                        <AnimatePresence>
+                            {taxonomyExpanded && (
+                                <motion.div
+                                    initial={{ opacity: 0, height: 0 }}
+                                    animate={{ opacity: 1, height: 'auto' }}
+                                    exit={{ opacity: 0, height: 0 }}
+                                    className="overflow-hidden"
+                                >
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                                        {/* Target Audience Config */}
+                                        <div className="flex flex-col gap-3 bg-slate-950/40 p-4 rounded-xl border border-white/5">
+                                            <div className="flex items-center justify-between">
+                                                <label className="text-[9px] font-black uppercase tracking-widest text-teal-400 flex items-center gap-2">
+                                                    <Users size={12} /> Target Audience Config
+                                                </label>
+                                                <span className="text-[8px] font-bold text-slate-500 uppercase tracking-wider">
+                                                    {audienceSecondaries.length} Selected
+                                                </span>
+                                            </div>
+                                            
+                                            <select
+                                                value={audiencePrimary || ''}
+                                                onChange={(e) => handleAudiencePrimaryChange(e.target.value)}
+                                                className="w-full bg-slate-950 border border-white/10 rounded-lg px-3 py-2 text-xs font-bold text-white uppercase tracking-wider focus:outline-none focus:ring-1 focus:ring-teal-500/20"
+                                            >
+                                                <option value="" disabled>Select Primary Subcategory</option>
+                                                {audiencePrimaryOptions.map(prim => (
+                                                    <option key={prim.id} value={prim.id}>{prim.name}</option>
+                                                ))}
+                                            </select>
 
-                                <div className="flex flex-col gap-2">
-                                    <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest flex justify-between">
-                                        <span>Secondary Subcategories</span>
-                                        <span className="text-teal-400 font-bold">{audienceSecondaries.length} Selected</span>
-                                    </span>
-                                    
-                                    <input
-                                        type="text"
-                                        placeholder="Filter subcategories..."
-                                        value={audienceSearch}
-                                        onChange={(e) => setAudienceSearch(e.target.value)}
-                                        className="w-full bg-slate-950 border border-white/5 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-teal-500/20 placeholder:text-slate-600"
-                                    />
+                                            <div className="flex flex-col gap-2">
+                                                <input
+                                                    type="text"
+                                                    placeholder="Filter audience tags..."
+                                                    value={audienceSearch}
+                                                    onChange={(e) => setAudienceSearch(e.target.value)}
+                                                    className="w-full bg-slate-950 border border-white/5 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-teal-500/20 placeholder:text-slate-600"
+                                                />
 
-                                    <div className="flex flex-wrap gap-2 max-h-[140px] overflow-y-auto p-2 bg-slate-950/60 rounded-xl custom-scrollbar border border-white/5">
-                                        {filteredAudienceSecondaries.length > 0 ? (
-                                            filteredAudienceSecondaries.map(sec => {
-                                                const isSelected = audienceSecondaries.includes(sec.id);
-                                                return (
-                                                    <button
-                                                        key={sec.id}
-                                                        onClick={() => {
-                                                            setAudienceSecondaries(prev => 
-                                                                prev.includes(sec.id) 
-                                                                    ? prev.filter(id => id !== sec.id) 
-                                                                    : [...prev, sec.id]
+                                                <div className="flex flex-wrap gap-1.5 max-h-[100px] overflow-y-auto p-1.5 bg-slate-950/60 rounded-lg custom-scrollbar border border-white/5">
+                                                    {filteredAudienceSecondaries.length > 0 ? (
+                                                        filteredAudienceSecondaries.map(sec => {
+                                                            const isSelected = audienceSecondaries.includes(sec.id);
+                                                            return (
+                                                                <button
+                                                                    key={sec.id}
+                                                                    onClick={() => {
+                                                                        setAudienceSecondaries(prev => 
+                                                                            prev.includes(sec.id) 
+                                                                                ? prev.filter(id => id !== sec.id) 
+                                                                                : [...prev, sec.id]
+                                                                        );
+                                                                    }}
+                                                                    className={`px-2 py-1 rounded text-[8px] font-bold uppercase tracking-wider border transition-all ${
+                                                                        isSelected 
+                                                                            ? 'bg-teal-500/20 border-teal-500 text-teal-400' 
+                                                                            : 'bg-slate-950 border-white/5 text-slate-500 hover:text-slate-300'
+                                                                    }`}
+                                                                >
+                                                                    {sec.name}
+                                                                </button>
                                                             );
-                                                        }}
-                                                        className={`px-3 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-widest border transition-all ${
-                                                            isSelected 
-                                                                ? 'bg-teal-500/20 border-teal-500 text-teal-400 shadow-lg shadow-teal-500/10' 
-                                                                : 'bg-slate-950 border-white/5 text-slate-500 hover:text-slate-300'
-                                                        }`}
-                                                    >
-                                                        {sec.name}
-                                                    </button>
-                                                );
-                                            })
-                                        ) : (
-                                            <span className="text-[9px] text-slate-600 uppercase tracking-widest p-2">No subcategories found</span>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
+                                                        })
+                                                    ) : (
+                                                        <span className="text-[8px] text-slate-600 uppercase tracking-wider p-1">No tags found</span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
 
-                            {/* Editorial Tone Config */}
-                            <div className="flex flex-col gap-4 bg-slate-950/40 p-5 rounded-2xl border border-white/5">
-                                <label className="text-[10px] font-black uppercase tracking-widest text-teal-400 flex items-center gap-2">
-                                    <Type size={14} /> Editorial Tone Config
-                                </label>
-                                
-                                <div className="flex flex-col gap-1">
-                                    <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Primary Subcategory</span>
-                                    <select
-                                        value={tonePrimary || ''}
-                                        onChange={(e) => handleTonePrimaryChange(e.target.value)}
-                                        className="w-full bg-slate-950 border-2 border-white/5 rounded-xl px-4 py-3 text-xs font-bold text-white uppercase tracking-widest focus:outline-none focus:ring-2 focus:ring-teal-500/20"
-                                    >
-                                        <option value="" disabled>Select Primary Subcategory</option>
-                                        {tonePrimaryOptions.map(prim => (
-                                            <option key={prim.id} value={prim.id}>{prim.name}</option>
-                                        ))}
-                                    </select>
-                                </div>
+                                        {/* Editorial Tone Config */}
+                                        <div className="flex flex-col gap-3 bg-slate-950/40 p-4 rounded-xl border border-white/5">
+                                            <div className="flex items-center justify-between">
+                                                <label className="text-[9px] font-black uppercase tracking-widest text-teal-400 flex items-center gap-2">
+                                                    <Type size={12} /> Editorial Tone Config
+                                                </label>
+                                                <span className="text-[8px] font-bold text-slate-500 uppercase tracking-wider">
+                                                    {toneSecondaries.length} Selected
+                                                </span>
+                                            </div>
+                                            
+                                            <select
+                                                value={tonePrimary || ''}
+                                                onChange={(e) => handleTonePrimaryChange(e.target.value)}
+                                                className="w-full bg-slate-950 border border-white/10 rounded-lg px-3 py-2 text-xs font-bold text-white uppercase tracking-wider focus:outline-none focus:ring-1 focus:ring-teal-500/20"
+                                            >
+                                                <option value="" disabled>Select Primary Subcategory</option>
+                                                {tonePrimaryOptions.map(prim => (
+                                                    <option key={prim.id} value={prim.id}>{prim.name}</option>
+                                                ))}
+                                            </select>
 
-                                <div className="flex flex-col gap-2">
-                                    <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest flex justify-between">
-                                        <span>Secondary Subcategories</span>
-                                        <span className="text-teal-400 font-bold">{toneSecondaries.length} Selected</span>
-                                    </span>
-                                    
-                                    <input
-                                        type="text"
-                                        placeholder="Filter subcategories..."
-                                        value={toneSearch}
-                                        onChange={(e) => setToneSearch(e.target.value)}
-                                        className="w-full bg-slate-950 border border-white/5 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-teal-500/20 placeholder:text-slate-600"
-                                    />
+                                            <div className="flex flex-col gap-2">
+                                                <input
+                                                    type="text"
+                                                    placeholder="Filter tone tags..."
+                                                    value={toneSearch}
+                                                    onChange={(e) => setToneSearch(e.target.value)}
+                                                    className="w-full bg-slate-950 border border-white/5 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-teal-500/20 placeholder:text-slate-600"
+                                                />
 
-                                    <div className="flex flex-wrap gap-2 max-h-[140px] overflow-y-auto p-2 bg-slate-950/60 rounded-xl custom-scrollbar border border-white/5">
-                                        {filteredToneSecondaries.length > 0 ? (
-                                            filteredToneSecondaries.map(sec => {
-                                                const isSelected = toneSecondaries.includes(sec.id);
-                                                return (
-                                                    <button
-                                                        key={sec.id}
-                                                        onClick={() => {
-                                                            setToneSecondaries(prev => 
-                                                                prev.includes(sec.id) 
-                                                                    ? prev.filter(id => id !== sec.id) 
-                                                                    : [...prev, sec.id]
+                                                <div className="flex flex-wrap gap-1.5 max-h-[100px] overflow-y-auto p-1.5 bg-slate-950/60 rounded-lg custom-scrollbar border border-white/5">
+                                                    {filteredToneSecondaries.length > 0 ? (
+                                                        filteredToneSecondaries.map(sec => {
+                                                            const isSelected = toneSecondaries.includes(sec.id);
+                                                            return (
+                                                                <button
+                                                                    key={sec.id}
+                                                                    onClick={() => {
+                                                                        setToneSecondaries(prev => 
+                                                                            prev.includes(sec.id) 
+                                                                                ? prev.filter(id => id !== sec.id) 
+                                                                                : [...prev, sec.id]
+                                                                        );
+                                                                    }}
+                                                                    className={`px-2 py-1 rounded text-[8px] font-bold uppercase tracking-wider border transition-all ${
+                                                                        isSelected 
+                                                                            ? 'bg-teal-500/20 border-teal-500 text-teal-400' 
+                                                                            : 'bg-slate-950 border-white/5 text-slate-500 hover:text-slate-300'
+                                                                    }`}
+                                                                >
+                                                                    {sec.name}
+                                                                </button>
                                                             );
-                                                        }}
-                                                        className={`px-3 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-widest border transition-all ${
-                                                            isSelected 
-                                                                ? 'bg-teal-500/20 border-teal-500 text-teal-400 shadow-lg shadow-teal-500/10' 
-                                                                : 'bg-slate-950 border-white/5 text-slate-500 hover:text-slate-300'
-                                                        }`}
-                                                    >
-                                                        {sec.name}
-                                                    </button>
-                                                );
-                                            })
-                                        ) : (
-                                            <span className="text-[9px] text-slate-600 uppercase tracking-widest p-2">No subcategories found</span>
-                                        )}
+                                                        })
+                                                    ) : (
+                                                        <span className="text-[8px] text-slate-600 uppercase tracking-wider p-1">No tags found</span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
-                                </div>
-                            </div>
-                        </div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
                     </div>
 
                     <div className="flex flex-col md:flex-row gap-4">

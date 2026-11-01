@@ -23,10 +23,16 @@ class Settings(BaseSettings):
     CELERY_BROKER_URL: str = "redis://hostname:6379/0"
     CELERY_RESULT_BACKEND: str = "redis://hostname:6379/0"
 
-    # OBSERVABILITY
+    # OBSERVABILITY & TRACING
     SENTRY_DSN: str = ""
     PROMETHEUS_METRICS_ENABLED: bool = True
     OTEL_EXPORTER_OTLP_ENDPOINT: str = "http://localhost:4317"
+    LANGFUSE_PUBLIC_KEY: str = ""
+    LANGFUSE_SECRET_KEY: str = ""
+    LANGFUSE_HOST: str = "https://cloud.langfuse.com"
+
+    # RERANKING & EVALS
+    COHERE_API_KEY: str = ""
 
     # CORS
     BACKEND_CORS_ORIGINS: List[str] = [

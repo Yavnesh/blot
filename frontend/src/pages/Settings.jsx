@@ -40,6 +40,25 @@ const Settings = () => {
     const [blogSources, setBlogSources] = useState([]);
     const [instagramSources, setInstagramSources] = useState([]);
 
+    const normalizeSources = (sourcesList) => {
+        if (!Array.isArray(sourcesList)) return [];
+        return sourcesList.map(src => {
+            if (typeof src === 'string') {
+                let inferredType = 'website';
+                if (src.includes('youtube.com') || src.includes('youtu.be')) inferredType = 'youtube';
+                else if (src.includes('rss') || src.endsWith('.xml')) inferredType = 'rss';
+                return { type: inferredType, value: src };
+            }
+            if (src && typeof src === 'object') {
+                return {
+                    type: src.type || 'website',
+                    value: src.value || src.url || src.handle || src.name || ''
+                };
+            }
+            return { type: 'website', value: String(src || '') };
+        });
+    };
+
     useEffect(() => {
         if (user) {
             const org = user.organizations?.find(o => o.id.toString() === orgId?.toString()) || user.organizations?.[0];
@@ -48,8 +67,8 @@ const Settings = () => {
                 role_position: user.role_position || '',
                 personalization_enabled: org?.personalization_enabled ?? true
             });
-            setBlogSources(org?.blog_sources || []);
-            setInstagramSources(org?.instagram_sources || []);
+            setBlogSources(normalizeSources(org?.blog_sources));
+            setInstagramSources(normalizeSources(org?.instagram_sources));
         }
     }, [user, orgId]);
 
@@ -111,7 +130,7 @@ const Settings = () => {
     };
 
     return (
-        <div className="max-w-[1200px] mx-auto p-4 lg:p-0 space-y-12">
+        <div className="w-full max-w-[1400px] mx-auto p-4 md:p-8 lg:p-12 space-y-12 pb-32">
             <header className="flex justify-between items-end">
                 <div>
                     <h1 className="text-3xl font-black tracking-tighter text-white flex items-center gap-3">
@@ -400,12 +419,18 @@ const RestrictedAreaTab = ({ tabName }) => {
     );
 };
 
-const SourcesManager = ({ title, sources, onChange, themeColor = 'teal' }) => {
+const SourcesManager = ({ title, sources = [], onChange, themeColor = 'teal' }) => {
     const [type, setType] = useState('website');
     const [value, setValue] = useState('');
     const [search, setSearch] = useState('');
     const [filterType, setFilterType] = useState('all');
     const [validationError, setValidationError] = useState('');
+
+    const safeSources = (Array.isArray(sources) ? sources : []).map(src => {
+        if (typeof src === 'string') return { type: 'website', value: src };
+        if (src && typeof src === 'object') return { type: src.type || 'website', value: src.value || src.url || src.handle || '' };
+        return { type: 'website', value: String(src || '') };
+    });
 
     const handleAdd = () => {
         if (!value.trim()) {
@@ -420,16 +445,17 @@ const SourcesManager = ({ title, sources, onChange, themeColor = 'teal' }) => {
 
         setValidationError('');
         const newSource = { type, value: value.trim() };
-        onChange([...sources, newSource]);
+        onChange([...safeSources, newSource]);
         setValue('');
     };
 
     const handleRemove = (indexToRemove) => {
-        onChange(sources.filter((_, idx) => idx !== indexToRemove));
+        onChange(safeSources.filter((_, idx) => idx !== indexToRemove));
     };
 
-    const filteredSources = sources.filter(src => {
-        const matchesSearch = src.value.toLowerCase().includes(search.toLowerCase());
+    const filteredSources = safeSources.filter(src => {
+        const valStr = String(src.value || '');
+        const matchesSearch = valStr.toLowerCase().includes(search.toLowerCase());
         const matchesFilter = filterType === 'all' || src.type === filterType;
         return matchesSearch && matchesFilter;
     });
@@ -556,7 +582,7 @@ const SourcesManager = ({ title, sources, onChange, themeColor = 'teal' }) => {
                         </div>
                     ) : (
                         filteredSources.map((src, index) => {
-                            const originalIndex = sources.findIndex(s => s.value === src.value && s.type === src.type);
+                            const originalIndex = safeSources.findIndex(s => s.value === src.value && s.type === src.type);
                             return (
                                 <div 
                                     key={index} 

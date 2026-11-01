@@ -61,4 +61,5 @@ class Organization(Base):
     instagram_sources = Column(JSON, default=list)
 
     users = relationship("User", secondary=user_organization, back_populates="organizations")
+    projects = relationship("Project", back_populates="organization", cascade="all, delete-orphan")
 

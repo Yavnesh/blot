@@ -251,6 +251,10 @@ class AggregatorAgent(BaseAgent):
             if not research_data:
                 return AgentOutput(data={}, status="error", feedback="No articles found from trusted publishers")
 
+            # Apply semantic reranking to select the highest signal chunks
+            from app.services.reranker import rerank_documents
+            research_data = rerank_documents(query=topic_name, documents=research_data, top_n=5)
+
             # ──────────────────────────────────────────────────────────────────
             # STEP 4: FACT GRAPH EXTRACTION
             # ──────────────────────────────────────────────────────────────────

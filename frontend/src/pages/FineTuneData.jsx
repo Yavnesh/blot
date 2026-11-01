@@ -30,7 +30,7 @@ const FineTuneData = () => {
     );
 
     return (
-        <div className="max-w-[1720px] mx-auto p-4 lg:p-0 space-y-12">
+        <div className="w-full max-w-[1720px] mx-auto p-4 md:p-8 lg:p-12 space-y-12">
             <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
                 <div className="max-w-3xl">
                     <h1 className="text-3xl font-black tracking-tighter text-white flex items-center gap-3">

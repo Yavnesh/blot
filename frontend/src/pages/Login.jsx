@@ -4,11 +4,13 @@ import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card'
 import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
 import { useAuthStore } from '../store/authStore';
+import { Eye, EyeOff } from 'lucide-react';
 
 export default function Login() {
     const { setToken, token, user } = useAuthStore();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
@@ -105,14 +107,23 @@ export default function Login() {
                             <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">
                                 Consensus Key (Password)
                             </label>
-                            <Input
-                                type="password"
-                                required
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                placeholder="••••••••"
-                                className="bg-slate-900/50 border-white/5 text-white h-14 rounded-2xl focus:ring-teal-500/20"
-                            />
+                            <div className="relative">
+                                <Input
+                                    type={showPassword ? "text" : "password"}
+                                    required
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    placeholder="••••••••"
+                                    className="bg-slate-900/50 border-white/5 text-white h-14 rounded-2xl focus:ring-teal-500/20 pr-12"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-teal-400 transition-colors p-1"
+                                >
+                                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                </button>
+                            </div>
                         </div>
 
                         <Button 

@@ -57,8 +57,21 @@ async def run_langgraph_pipeline(job_id: str, org_id: int, langgraph_state: dict
         "message": "Orchestrator started."
     })
 
-    # Pass the job_id as the thread_id for state persistence
+    # Pass the job_id as the thread_id for state persistence and Langfuse tracing
+    from app.core.observability import get_langfuse_callback_handler
+    
+    callbacks = []
+    lf_handler = get_langfuse_callback_handler(
+        trace_name="orchestrator_pipeline",
+        user_id=str(org_id),
+        metadata={"job_id": job_id, "org_id": org_id, "topic": langgraph_state.get("user_topic")}
+    )
+    if lf_handler:
+        callbacks.append(lf_handler)
+
     config = {"configurable": {"thread_id": job_id}}
+    if callbacks:
+        config["callbacks"] = callbacks
 
     async for event in orchestrator_app.astream(langgraph_state, config=config):
 
@@ -556,3 +569,66 @@ def resume_seo_pipeline_task(self, job_id: str, org_id: int, approved: bool, fee
             logger.error(f"Failed to mark task as error on resumption: {err_save}")
 
         raise self.retry(exc=exc, countdown=60)
+
+
+@celery_app.task(bind=True, name="blot.orchestrator.rewind_seo_pipeline", max_retries=3, queue="heavy")
+def rewind_seo_pipeline_task(self, job_id: str, org_id: int, target_node: str, feedback: str = "", state_overrides: dict = None):
+    """
+    Celery background worker task for rewinding an execution to a specific node,
+    injecting user corrections/feedback, and re-executing subsequent nodes.
+    """
+    logger.info(f"Celery Worker rewinding Job ID {job_id} to node '{target_node}'")
+    from asgiref.sync import async_to_sync
+
+    async def execute_rewind():
+        config = {"configurable": {"thread_id": job_id}}
+
+        # Prepare state mutation
+        overrides = state_overrides or {}
+        if feedback:
+            overrides["human_feedback"] = feedback
+            overrides["human_approved"] = False
+
+        # Load current state and re-point execution to target_node
+        await orchestrator_app.aupdate_state(
+            config,
+            overrides,
+            as_node=target_node
+        )
+
+        await publish_update(f"org_updates:{org_id}", {
+            "task_id": job_id,
+            "status": "running",
+            "current_step": target_node,
+            "message": f"Rewound to step '{target_node}'. Re-running with feedback."
+        })
+
+        # Run stream from target node
+        final_state = {}
+        async for event in orchestrator_app.astream(None, config=config):
+            for node_name, state_update in event.items():
+                if not isinstance(state_update, dict):
+                    continue
+
+                logs = state_update.get("logs", [])
+                last_message = logs[-1] if logs else f"Step {node_name} completed."
+                await publish_update(f"org_updates:{org_id}", {
+                    "task_id": job_id,
+                    "status": "running",
+                    "current_step": node_name,
+                    "message": last_message,
+                    "logs": logs
+                })
+                final_state.update(state_update)
+
+        snapshot = await orchestrator_app.aget_state(config)
+        return snapshot.values
+
+    try:
+        final_state = async_to_sync(execute_rewind)()
+        logger.success(f"Rewind pipeline finished successfully for Job ID {job_id}")
+        return final_state
+    except Exception as exc:
+        logger.error(f"Rewind failed for Job ID {job_id}: {exc}")
+        raise self.retry(exc=exc, countdown=60)
+

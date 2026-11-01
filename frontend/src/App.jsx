@@ -17,6 +17,8 @@ import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import InstagramWorkspace from './pages/InstagramWorkspace';
 import InstagramLedger from './pages/InstagramLedger';
+import TestBionicWorkspace from './pages/TestBionicWorkspace';
+import TestDashboard from './pages/TestDashboard';
 
 // Simple Route Protection Component
 function PrivateWrapper({ children }) {
@@ -49,6 +51,10 @@ function PrivateWrapper({ children }) {
   return <DashboardLayout>{children}</DashboardLayout>;
 }
 
+import ManagerReviewQueue from './pages/ManagerReviewQueue';
+import AdminProjects from './pages/AdminProjects';
+import PublishingHub from './pages/PublishingHub';
+
 function App() {
   return (
     <Router>
@@ -64,8 +70,12 @@ function App() {
           {/* Default to Workspace as Requested */}
           <Route path="/" element={<Navigate to="/workspace" replace />} />
           
-          <Route path="/ledger" element={<PrivateWrapper><Dashboard /></PrivateWrapper>} />
           <Route path="/workspace" element={<PrivateWrapper><BionicWorkspace /></PrivateWrapper>} />
+          <Route path="/manager/reviews" element={<PrivateWrapper><ManagerReviewQueue /></PrivateWrapper>} />
+          <Route path="/manager/publishing" element={<PrivateWrapper><PublishingHub /></PrivateWrapper>} />
+          <Route path="/admin/projects" element={<PrivateWrapper><AdminProjects /></PrivateWrapper>} />
+
+          <Route path="/ledger" element={<PrivateWrapper><Dashboard /></PrivateWrapper>} />
           <Route path="/instagram-workspace" element={<PrivateWrapper><InstagramWorkspace /></PrivateWrapper>} />
           <Route path="/instagram-ledger" element={<PrivateWrapper><InstagramLedger /></PrivateWrapper>} />
           <Route path="/topics" element={<PrivateWrapper><Topics /></PrivateWrapper>} />

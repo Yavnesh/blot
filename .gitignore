@@ -67,6 +67,7 @@ backend/app.db
 .gemini/
 *.log
 logs/
+.pids/
 temp/
 tmp/
 tests/

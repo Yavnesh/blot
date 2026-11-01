@@ -53,8 +53,19 @@ export const useAuthStore = create((set, get) => ({
                     localStorage.setItem('active_org_id', activeOrgId);
                 }
 
+                // Derive normalized role (admin, manager, creator)
+                let role = "creator";
+                if (userData.is_superuser) {
+                    role = "admin";
+                } else if (userData.role) {
+                    const r = userData.role.toLowerCase();
+                    if (r === "owner" || r === "admin") role = "admin";
+                    else if (r === "editor" || r === "manager") role = "manager";
+                }
+
                 set({ 
                     user: userData, 
+                    userRole: role,
                     organizations: organizations,
                     orgId: activeOrgId,
                     isLoadingUser: false

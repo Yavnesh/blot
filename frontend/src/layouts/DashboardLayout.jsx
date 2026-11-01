@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuthStore } from '../store/authStore';
+import { useProjectStore } from '../store/projectStore';
 import { 
     LayoutDashboard, 
     Zap, 
@@ -16,31 +17,56 @@ import {
     BrainCircuit,
     Layers,
     Search,
-    Instagram
+    Instagram,
+    CheckSquare,
+    Share2,
+    FolderKanban
 } from 'lucide-react';
 
 const DashboardLayout = ({ children }) => {
     const [sidebarOpen, setSidebarOpen] = useState(true);
-    const { user, orgId, setOrgId, logout, organizations } = useAuthStore();
+    const { user, token, orgId, setOrgId, logout, organizations, userRole } = useAuthStore();
+    const { projects, activeProjectId, setActiveProjectId, fetchProjects } = useProjectStore();
     const location = useLocation();
 
-    const navItems = [
-        { name: 'Intelligence Ledger', path: '/ledger', icon: <LayoutDashboard size={18} /> },
-        { name: 'Bionic Workspace', path: '/workspace', icon: <Zap size={18} /> },
+    useEffect(() => {
+        if (token) {
+            fetchProjects(token);
+        }
+    }, [token, fetchProjects]);
+
+    // Role-specific navigation groups
+    const creatorItems = [
+        { name: 'Bionic Studio', path: '/workspace', icon: <Zap size={18} /> },
         { name: 'Instagram Workspace', path: '/instagram-workspace', icon: <Instagram size={18} /> },
-        { name: 'Instagram Ledger', path: '/instagram-ledger', icon: <LayoutDashboard size={18} /> },
-        { name: 'Discovery Hub', path: '/topics', icon: <Globe size={18} /> },
-        { name: 'Research Engine', path: '/scrape', icon: <Search size={18} /> },
         { name: 'Post Repository', path: '/posts', icon: <Terminal size={18} /> },
         { name: 'Knowledge Vault', path: '/vault', icon: <Database size={18} /> },
     ];
 
+    const managerItems = [
+        { name: 'Review Queue', path: '/manager/reviews', icon: <CheckSquare size={18} /> },
+        { name: 'Publishing Hub', path: '/manager/publishing', icon: <Share2 size={18} /> },
+        { name: 'Intelligence Ledger', path: '/ledger', icon: <LayoutDashboard size={18} /> },
+        { name: 'Discovery Hub', path: '/topics', icon: <Globe size={18} /> },
+        { name: 'Research Engine', path: '/scrape', icon: <Search size={18} /> },
+    ];
+
     const adminItems = [
+        { name: 'Campaign Projects', path: '/admin/projects', icon: <FolderKanban size={18} /> },
         { name: 'Dataset Refinery', path: '/finetune', icon: <Layers size={18} /> },
         { name: 'System Settings', path: '/settings', icon: <Settings size={18} /> },
     ];
 
-    const activeItem = [...navItems, ...adminItems].find(item => item.path === location.pathname);
+    // Compute accessible items based on role
+    let displayedNavItems = [...creatorItems];
+    if (userRole === 'manager' || userRole === 'admin') {
+        displayedNavItems = [...displayedNavItems, ...managerItems];
+    }
+    if (userRole === 'admin') {
+        displayedNavItems = [...displayedNavItems, ...adminItems];
+    }
+
+    const activeItem = displayedNavItems.find(item => item.path === location.pathname);
 
     return (
         <div className="flex h-screen bg-slate-950 font-sans text-slate-100 selection:bg-teal-500/30 overflow-hidden">
@@ -73,33 +99,7 @@ const DashboardLayout = ({ children }) => {
                     <div>
                         <p className="text-[9px] md:text-[10px] font-black text-slate-600 mb-4 pl-4 uppercase tracking-[0.2em]">Console Orchestration</p>
                         <nav className="space-y-1">
-                            {navItems.map((item) => {
-                                const isActive = location.pathname === item.path;
-                                return (
-                                    <Link
-                                        key={item.name}
-                                        to={item.path}
-                                        onClick={() => window.innerWidth < 1024 && setSidebarOpen(false)}
-                                        className={`flex items-center px-4 py-3 rounded-2xl transition-all group relative ${isActive
-                                            ? 'bg-teal-500/10 text-teal-400 shadow-lg shadow-teal-500/5'
-                                            : 'text-slate-500 hover:text-slate-200 hover:bg-white/5'
-                                            }`}
-                                    >
-                                        {isActive && <div className="absolute left-0 w-1 h-6 bg-teal-500 rounded-full" />}
-                                        <div className={`mr-4 transition-colors ${isActive ? 'text-teal-400' : 'text-slate-600 group-hover:text-slate-400'}`}>
-                                            {item.icon}
-                                        </div>
-                                        <span className="text-[10px] md:text-xs font-black uppercase tracking-widest">{item.name}</span>
-                                    </Link>
-                                );
-                            })}
-                        </nav>
-                    </div>
-
-                    <div>
-                        <p className="text-[9px] md:text-[10px] font-black text-slate-600 mb-4 pl-4 uppercase tracking-[0.2em]">System Logic</p>
-                        <nav className="space-y-1">
-                            {adminItems.map((item) => {
+                            {displayedNavItems.map((item) => {
                                 const isActive = location.pathname === item.path;
                                 return (
                                     <Link
@@ -160,12 +160,13 @@ const DashboardLayout = ({ children }) => {
                         </button>
                         
                         <div className="flex items-center gap-3 md:gap-4 min-w-0">
+                            {/* Organization Switcher */}
                             <div className="flex flex-col gap-1 min-w-0">
-                                <span className="text-[7px] md:text-[8px] font-black text-slate-500 uppercase tracking-widest leading-none">Perspective</span>
+                                <span className="text-[7px] md:text-[8px] font-black text-slate-500 uppercase tracking-widest leading-none">Organization</span>
                                 <select 
                                     value={orgId || ''} 
                                     onChange={(e) => setOrgId(e.target.value)}
-                                    className="text-[10px] md:text-xs font-black text-white bg-transparent border-none focus:ring-0 p-0 pr-6 uppercase tracking-widest cursor-pointer hover:text-teal-400 transition-colors appearance-none outline-none truncate"
+                                    className="text-[10px] md:text-xs font-black text-white bg-transparent border-none focus:ring-0 p-0 pr-4 uppercase tracking-widest cursor-pointer hover:text-teal-400 transition-colors appearance-none outline-none truncate"
                                 >
                                     <option value="" disabled className="bg-slate-900">Switch Realm</option>
                                     {organizations.map((org) => (
@@ -175,11 +176,32 @@ const DashboardLayout = ({ children }) => {
                                     ))}
                                 </select>
                             </div>
+
                             <div className="h-6 w-[1px] bg-white/10 shrink-0" />
+
+                            {/* Project Switcher */}
                             <div className="flex flex-col gap-1 min-w-0">
-                                <span className="text-[7px] md:text-[8px] font-black text-slate-500 uppercase tracking-widest leading-none">Active Matrix</span>
-                                <span className="text-[10px] md:text-xs font-black text-teal-400 uppercase tracking-widest truncate">
-                                    {activeItem?.name || 'In-Process'}
+                                <span className="text-[7px] md:text-[8px] font-black text-slate-500 uppercase tracking-widest leading-none">Project Campaign</span>
+                                <select 
+                                    value={activeProjectId || ''} 
+                                    onChange={(e) => setActiveProjectId(e.target.value)}
+                                    className="text-[10px] md:text-xs font-black text-teal-400 bg-transparent border-none focus:ring-0 p-0 pr-4 uppercase tracking-widest cursor-pointer hover:text-teal-300 transition-colors appearance-none outline-none truncate"
+                                >
+                                    <option value="" disabled className="bg-slate-900">Select Project</option>
+                                    {projects.map((proj) => (
+                                        <option key={proj.id} value={proj.id} className="bg-slate-900">
+                                            {proj.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="h-6 w-[1px] bg-white/10 shrink-0" />
+
+                            {/* Role Indicator Badge */}
+                            <div className="hidden sm:flex items-center">
+                                <span className="px-2.5 py-1 rounded-full text-[8px] font-black uppercase tracking-wider bg-teal-500/10 text-teal-400 border border-teal-500/20">
+                                    {userRole || 'creator'}
                                 </span>
                             </div>
                         </div>

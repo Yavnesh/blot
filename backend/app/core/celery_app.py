@@ -8,6 +8,7 @@ celery_app = Celery(
     backend=settings.CELERY_RESULT_BACKEND,
     include=[
         'app.modules.orchestrator.service.pipeline_tasks',
+        'app.modules.orchestrator.service.test_pipeline_tasks',
         'app.tasks.rag_tasks'
     ]
 )
@@ -24,6 +25,7 @@ celery_app.conf.update(
     # Queue Separation
     task_routes={
         "blot.orchestrator.*": {"queue": "heavy"},
+        "blot.test_orchestrator.*": {"queue": "heavy"},
         "blot.rag.*": {"queue": "default"},
     },
     task_default_queue="default",

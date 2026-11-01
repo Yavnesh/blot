@@ -182,3 +182,9 @@ xxhash==3.6.0
 yarl==1.22.0
 zipp==3.23.0
 zstandard==0.25.0
+
+# Observability, Evals & Quality
+langfuse>=2.0.0
+deepeval>=1.0.0
+ragas>=0.2.0
+cohere>=5.0.0
